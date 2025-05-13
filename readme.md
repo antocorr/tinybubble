@@ -4,7 +4,7 @@ A reactive vanilla javascript library based on singnals and pub sub.
 ## Import the library
 ### As a ES-6 module (recommended) from CDN
 ```javascript
-import { createComponent } from "https://cdn.jsdelivr.net/gh/antocorr/bubble/dist/bubble.js"
+import { createComponent } from "https://cdn.jsdelivr.net/gh/antocorr/bubble/src/lib/dist/bubble.js"
 ```
 
 ### Import via npm
@@ -42,7 +42,7 @@ export default {
     data(){
         return{
             counter: 1,
-            name: 'Ken'
+            character: 'Ken'
         }
     }
 }
@@ -88,4 +88,10 @@ btn.onclick = () => {
 
 we are just testing shoelace support.
 
+basic example: https://antocorr.github.io/bubble/examples/reactivity/basic.html
+
+effect example: https://antocorr.github.io/bubble/examples/reactivity/effect.html
+
 example: https://antocorr.github.io/bubble/examples/reactivity/shoelace.html
+
+router: https://antocorr.github.io/bubble/examples/router/index.html
