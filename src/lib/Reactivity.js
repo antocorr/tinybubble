@@ -1,6 +1,7 @@
-import { effect, Signal } from "./Signals.js";
+import { effect, Signal, SignalObject } from "./Signals.js";
+
 /**
- * 
+ * Create an HTML element from a string
  * @param {string} markup 
  * @returns {HTMLElement}
  */
@@ -9,282 +10,494 @@ export function html(markup) {
     tp.innerHTML = markup.trim();
     return tp.content.firstElementChild;
 }
+
 const styleTagsAdded = [];
+
+/**
+ * Replaces syntax sugar (@click -> -x-onclick)
+ */
 function bubblify(str) {
-    //replace all @click with -bb-onclick
-    str = str.replace(/@click/g, '-x-onclick');
-    return str;
+    return str
+        .replace(/@click/g, '-x-onclick')
+        .replace(/@change/g, '-x-onchange')
+        .replace(/@input/g, '-x-oninput');
 }
+
+/**
+ * Prepares {{ }} strings for replacement
+ */
 function prepareForReplace(txt) {
-    /**
-     * @type {string[]}
-     */
     const textArr = txt.split('{{');
     const reactiveIndexes = [];
     for (let i = 0; i < textArr.length; i++) {
         if (textArr[i].includes('}}')) {
             const parts = textArr[i].split('}}');
             textArr[i] = parts[0];
-            //add second part to the array
             textArr.splice(i + 1, 0, parts[1]);
             reactiveIndexes.push(i);
         }
     }
     return [textArr, reactiveIndexes];
 }
+
+const fnCache = new Map();
+
 /**
- * 
- * @param {{}} component 
- * @param {HTMLElement} child 
- * @param {string[]} textArr 
- * @param {number[]} reactiveIndexes 
+ * Helper to evaluate JS expressions within the data context
+ * Ex: "count > 5" or "isShow"
  */
-function replace(component, child, textArr, reactiveIndexes, moreData = {}) {
-    let newText = '';
-    const data = { ...component._data, ...moreData, ...component.props };
-    if (Object.keys(moreData).length) {
-        // console.log('moreData', moreData);
+function evaluate(expression, scope, context = null, returnResult = true) {
+    try {
+        // Replace 'this' with '__component__' to allow safe access to component properties
+        // This avoids using 'with' or 'eval' while supporting 'this.prop' syntax
+        const keys = Object.keys(scope);
+        // Filter keys to ensure they are valid JS identifiers AND appear in the expression
+        const validKeys = keys.filter(k => {
+            return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k) && new RegExp(`\\b${k}\\b`).test(expression);
+        });
+
+        // Cache Key: Expression + keys (sorted to ensure consistency)
+        // We sort validKeys in place, so subsequent usage (map, new Function) uses the sorted order
+        validKeys.sort();
+        const cacheKey = expression + '::' + validKeys.join(',');
+
+        let fn = fnCache.get(cacheKey);
+
+        if (!fn) {
+            // Create function using destructuring-like approach (arguments)
+            // 'this' is supported via .apply()
+            const body = returnResult ? `return ${expression};` : `${expression};`;
+            fn = new Function(...validKeys, body);
+            fnCache.set(cacheKey, fn);
+        }
+
+        // Extract values in the same order as keys
+        const values = validKeys.map(k => {
+            return (scope[k] instanceof SignalObject) ? scope[k].value : scope[k];
+        });
+
+        return fn.apply(context, values);
+    } catch (e) {
+        // Suppress ReferenceError (treat as undefined) to avoid console noise for missing variables
+        if (!(e instanceof ReferenceError)) {
+            console.warn(`Error evaluating expression "${expression}":`, e);
+        }
+        return undefined;
     }
-    for (let i = 0; i < textArr.length; i++) {
-        if (reactiveIndexes.includes(i)) {
-            const key = textArr[i].trim();
-            if (data && data[key]) {
-                newText += data[key].value;
-            } else {
-                console.error(`Key ${key} not found in data`);
+}
+
+// ============================================================
+// DIRECTIVE HANDLERS
+// ============================================================
+
+function handleFor(el, component, localScope, bindNodeFn) {
+    if (!el.hasAttribute('x-for')) return false;
+
+    const attr = el.getAttribute('x-for'); // "item in items"
+    const [rawItemKey, listKey] = attr.split(' in ').map(s => s.trim());
+    let itemKey = rawItemKey;
+    let indexKey = null;
+
+    const destructured = rawItemKey.match(/^\(\s*([^()]+)\s*\)$/);
+    if (destructured && destructured[1].includes(',')) {
+        const [itemName, idxName] = destructured[1].split(',').map(p => p.trim());
+        if (itemName) itemKey = itemName;
+        if (idxName) indexKey = idxName;
+    }
+
+    const anchor = document.createTextNode('');
+    const parent = el.parentNode;
+    parent.insertBefore(anchor, el);
+
+    // If it's a <template> tag, use its content, otherwise clone the element itself
+    const isTemplate = el.tagName === 'TEMPLATE';
+    const templateContent = isTemplate ? el.content : el;
+
+    // Remove the original template element from the visible DOM
+    el.remove();
+
+    let renderedItems = [];
+
+    effect(() => {
+        // Clean up old elements
+        renderedItems.forEach(node => node.remove());
+        renderedItems = [];
+
+        // Construct scope lazily
+        const currentScope = { ...component._methods, ...component._data, ...component.props, ...localScope };
+
+        // Get array from data
+        const listSignal = currentScope[listKey];
+        const list = listSignal ? (listSignal instanceof SignalObject ? listSignal.value : listSignal) : [];
+
+        if (Array.isArray(list)) {
+            list.forEach((itemData, idx) => {
+                // Clone the template
+                const clone = templateContent.cloneNode(true);
+
+                // If it was a template tag, cloneNode returns a DocumentFragment
+                // We must iterate its children to apply binding
+                // If it was a regular element, clone is the element itself
+                if (!isTemplate) clone.removeAttribute('x-for');
+                const nodesToInsert = isTemplate ? [...clone.childNodes] : [clone];
+
+                nodesToInsert.forEach(child => {
+                    // Pass single item to scope
+                    const scoped = indexKey
+                        ? { ...localScope, [itemKey]: itemData, [indexKey]: idx }
+                        : { ...localScope, [itemKey]: itemData };
+                    bindNodeFn(child, component, scoped);
+                    parent.insertBefore(child, anchor);
+                    renderedItems.push(child);
+                });
+            });
+        }
+    });
+
+    return true; // Stop recursion on this branch (handled internally)
+}
+
+function handleIf(el, component, localScope, bindNodeFn) {
+    if (!el.getAttribute('x-if')) return false;
+
+    const expr = el.getAttribute('x-if');
+    const anchor = document.createComment('x-if-anchor');
+    el.parentNode.insertBefore(anchor, el);
+
+    const isTemplate = el.tagName === 'TEMPLATE';
+    const templateContent = isTemplate ? el.content : el;
+    el.remove();
+
+    let renderedNode = null;
+
+    effect(() => {
+        const currentScope = { ...component._methods, ...component._data, ...component.props, ...localScope };
+        const result = evaluate(expr, currentScope, component);
+
+        if (result) {
+            if (!renderedNode) {
+                const clone = templateContent.cloneNode(true);
+
+                // If template, insert children. If element, insert element.
+                if (!isTemplate) clone.removeAttribute('x-if');
+                const nodesToInsert = isTemplate ? [...clone.childNodes] : [clone];
+
+                nodesToInsert.forEach(child => {
+                    bindNodeFn(child, component, localScope);
+                    anchor.parentNode.insertBefore(child, anchor);
+                });
+                // Keep track for removal
+                renderedNode = nodesToInsert;
             }
         } else {
-            newText += textArr[i];
+            if (renderedNode) {
+                renderedNode.forEach(n => n.remove());
+                renderedNode = null;
+            }
+        }
+    });
+    return true;
+}
+
+function handleShowHide(el, component, localScope) {
+    if (el.hasAttribute('x-show') || el.hasAttribute('x-hide')) {
+        const isShow = el.hasAttribute('x-show');
+        const expr = el.getAttribute(isShow ? 'x-show' : 'x-hide');
+        effect(() => {
+            const currentScope = { ...component._methods, ...component._data, ...component.props, ...localScope };
+            let res = evaluate(expr, currentScope, component);
+            if (!isShow) res = !res;
+            el.style.display = res ? '' : 'none';
+        });
+    }
+}
+
+function handleRefs(el, component) {
+    if (el.hasAttribute('ref')) {
+        component.refs[el.getAttribute('ref')] = el;
+    }
+}
+
+function handleEvents(el, component, localScope) {
+    [...el.attributes].forEach(attr => {
+        if (attr.name.startsWith('-x-on')) {
+            const eventName = attr.name.replace('-x-on', ''); // click, change...
+            const expr = attr.value;
+
+            el.addEventListener(eventName, (event) => {
+                // available in eval as $event
+                const currentScope = { ...component._methods, ...component._data, ...component.props, ...localScope };
+                const eventScope = { ...currentScope, $event: event };
+                evaluate(expr, eventScope, component, false);
+            });
+        }
+    });
+}
+
+function handleModel(el, component, localScope) {
+    if (el.hasAttribute('x-model')) {
+        const key = el.getAttribute('x-model');
+        // We need scope to find the signal
+        const currentScope = { ...component._methods, ...component._data, ...component.props, ...localScope };
+        if (currentScope[key] && currentScope[key] instanceof SignalObject) {
+            const signal = currentScope[key];
+            // Init
+            el.value = signal.value;
+            // DOM Listener
+            el.addEventListener('input', () => signal.value = el.value);
+            // Signal Listener
+            effect(() => {
+                if (el.value !== signal.value) el.value = signal.value;
+            });
         }
     }
-    child.textContent = newText;
 }
+
+function handleCustomComponent(el, component, localScope) {
+    // Handle Nested Components (custom tags defined in component.components)
+    const tagName = el.tagName.toLowerCase();
+    if (component.components && component.components[tagName]) {
+        const currentScope = { ...component._methods, ...component._data, ...component.props, ...localScope };
+        const compDef = component.components[tagName];
+        const childProps = { children: el.innerHTML };
+        [...el.attributes].forEach(attr => {
+            if (attr.name.startsWith(':')) {
+                // :prop="val" -> evaluate expression
+                childProps[attr.name.substring(1)] = evaluate(attr.value, currentScope, component);
+            } else {
+                // prop="val" -> static string
+                childProps[attr.name] = attr.value;
+            }
+        });
+        if (boundElements.has(el)) {
+            return;
+        }
+        const childComp = createComponent(compDef, undefined, childProps);
+        el.replaceWith(childComp.$element);
+
+        // If it's a functional component (no internal state), we must bind it to the current scope
+        // so that slots/children (like {{item.label}}) can be interpolated.
+        if (!childComp._data) {
+            bindNode(childComp.$element, component, localScope);
+        }
+
+        return true; // Node replaced, stop
+    }
+    return false;
+}
+
+function handleTextNode(el, component, localScope) {
+    if (el.textContent.includes('{{')) {
+        // Ignore legacy blocks if present
+        if (el.textContent.includes('#each') || el.textContent.includes('/each')) return;
+
+        const [textArr, reactiveIndexes] = prepareForReplace(el.textContent);
+
+        effect(() => {
+            const currentScope = { ...component._methods, ...component._data, ...component.props, ...localScope };
+            let newText = '';
+            for (let i = 0; i < textArr.length; i++) {
+                if (reactiveIndexes.includes(i)) {
+                    const keyExpr = textArr[i].trim();
+                    // Try to evaluate expression
+                    const val = evaluate(keyExpr, currentScope, component);
+                    newText += (val !== undefined && val !== null) ? val : '';
+                } else {
+                    newText += textArr[i];
+                }
+            }
+            el.textContent = newText;
+        });
+    }
+}
+
+// ============================================================
+// CORE: Recursive binding function (Traverse)
+// ============================================================
+
+function handleAttributes(el, component, localScope) {    
+    [...el.attributes].forEach(attr => {
+        if (attr.name.startsWith(':')) {
+            const attrName = attr.name.substring(1);
+            const expr = attr.value;
+            effect(() => {
+                const currentScope = { ...component._methods, ...component._data, ...component.props, ...localScope };
+                const val = evaluate(expr, currentScope, component);
+                if (val !== undefined && val !== null) {
+                    el.setAttribute(attrName, val);
+                } else {
+                    el.removeAttribute(attrName);
+                }
+            });
+        }
+    });
+}
+const boundElements = new Set();
+function bindNode(el, component, localScope) {
+    if (el && el.tagName == 'svg') {
+        return;
+    }
+    if (boundElements.has(el)) {
+        return;
+    }
+    // A. Handle Elements (Node Type 1)
+    if (el.nodeType === 1) {
+
+        // 1. Handle x-for (Stops normal descent, handles its own children)
+        if (handleFor(el, component, localScope, bindNode)) return;
+
+        // 2. Handle x-if (Stops descent if false)
+        if (handleIf(el, component, localScope, bindNode)) return;
+
+        // 3. Handle x-show / x-hide
+        handleShowHide(el, component, localScope);
+
+        // 4. Handle Refs
+        handleRefs(el, component);
+
+        // 5. Handle Events (-x-onclick, -x-onchange, etc.)
+        handleEvents(el, component, localScope);
+
+        // 6. Handle x-model
+        handleModel(el, component, localScope);
+
+        // 7. Handle Nested Components
+        if (el != component.$element) {   
+            if (handleCustomComponent(el, component, localScope)) { 
+                boundElements.add(el);
+                return;
+            } 
+        }
+        boundElements.add(el);
+        // 8. Handle Colon-Prefixed Attributes
+        handleAttributes(el, component, localScope);
+
+        // 9. Recursion on standard children
+        let child = el.firstChild;        
+        while (child) {
+            const next = child.nextSibling;
+            bindNode(child, component, localScope);     
+            child = next;
+        }
+    }
+
+    // B. Handle Text Nodes (Interpolation {{ }})
+    else if (el.nodeType === 3) {
+        handleTextNode(el, component, localScope);
+    }
+}
+
 /**
- * 
- * @param {{}} original 
- * @param {{} | undefined} data 
- * @returns {{
- * $element: HTMLElement,
- * appendTo: (parent: HTMLElement) => void,
- * refs: {Object.<string, HTMLElement>},
- * _data: {Object.<string, SignalObject>},
- * }}
+ * Creates the component
  */
 export function createComponent(original, data, _props) {
+    // 0. Handle Functional Components (e.g. RouterView, RouterLink)
+    if (typeof original === 'function') {
+        const el = original({ ...data, ..._props });
+        return {
+            $element: el,
+            appendTo: (parent) => {
+                if (el) parent.appendChild(el);
+            }
+        };
+    }
+
+    // 1. Handle initial Props
     let props = {};
     if (data && data.props) {
-        props = data.props;
-        if (typeof props == "function") {
-            props = props();
-        }
+        props = typeof data.props === "function" ? data.props() : data.props;
         delete data.props;
     }
+
+    // 2. Setup base component object
     const component = {
         $element: null,
         appendTo: (parent) => {
             if (component.$element) {
                 parent.appendChild(component.$element);
-                if (component.mounted) {
-                    component.mounted();
-                }
+                if (component.mounted) component.mounted();
             }
         },
-        refs: {}, ...original, ...data,
-        props: {}
+        refs: {},
+        ...original,
+        ...data,
+        props: {},
+        _data: {}, // Internal reactive data
+        _methods: {} // Bound methods
     };
+
+    // 3. Initialize Props as Signals
     if (_props) {
         for (const k in _props) {
             component.props[k] = Signal(_props[k]);
         }
     }
-    let tp = component.setTemplate ? component.setTemplate : component.template;
-    if (typeof tp == "function") {
-        tp = tp.apply(component);
-    }
-    if (tp) {
-        //implement this {{#each features}}, replace with x-for in template
-        /**
-         *<ul class="list-disc list-inside mb-4">
-          {{#each item in features}}
-            <li>{{item}}</li>
-          {{/each}}
-        </ul>
-        put the content in a template tag string and replace the {{#each features}} with x-for="item in features"
-         */
 
+    // 4. Initialize Data as Signals
+    if (component.data) {
+        const initData = typeof component.data === "function" ? component.data() : component.data;
+        // Merge data and props for initial scope
+        const merged = { ...initData, ...props };
+
+        for (const key in merged) {
+            component._data[key] = Signal(merged[key]);
+        }
+    }
+
+    // 5. Initialize Methods (Bind to component)
+    for (const key in component) {
+        if (typeof component[key] === 'function') {
+            component._methods[key] = component[key].bind(component);
+        }
+    }
+
+    // 6. Handle Template (Legacy {{#each}} replacement)
+    let tp = component.setTemplate ? component.setTemplate : component.template;
+    if (typeof tp === "function") tp = tp.apply(component);
+
+    if (tp) {
+        // Convert old handlebars syntax to x-for on template
         const regex = /{{#each\s+(\w+)\s+in\s+(\w+)}}([\s\S]*?){{\/each}}/g;
         tp = tp.replace(regex, (match, item, array, content) => {
             return `<template x-for="${item} in ${array}"><div>${content}</div></template>`;
         });
         component.$element = html(bubblify(tp));
     }
+
+    // 7. Proxy Data and Props to allow this.property access
+    // const proxySignal = (target, source) => {
+    //     for (const key in source) {
+    //         if (!(key in target)) {
+    //             Object.defineProperty(target, key, {
+    //                 get: () => source[key].value,
+    //                 set: (v) => source[key].value = v,
+    //                 configurable: true,
+    //                 enumerable: true
+    //             });
+    //         }
+    //     }
+    // };
+    // proxySignal(component, component._data);
+    // proxySignal(component, component.props);
+
+    // 8. Start Binding
     if (component.$element) {
-        [...component.$element.querySelectorAll('[ref]')].forEach(e => {
-            component.refs[e.getAttribute('ref')] = e;
-        });
-        [...component.$element.querySelectorAll('[-x-onclick]')].forEach(e => {
-            const _this_component = component;
-            const fn = e.getAttribute('-x-onclick').replace('this.', '_this_component.');
-            e.onclick = () => eval(fn);
-        });
-        //traverse all elements that contain {{
-
-        if (component.data) {
-            if (typeof component.data == "function") {
-                component.data = component.data();
-            }
-            component._data = {};
-            const data = { ...component.data, ...props };
-            for (const key in data) {
-                component._data[key] = Signal(data[key]);
-                if (Array.isArray(data[key])) {
-                    for (let i = 0; i < data[key].length; i++) {
-                        component._data[key].value[i] = Signal(data[key][i]);
-                    }
-                }
-            }
-
-        }
-        //traverse x-model
-        [...component.$element.querySelectorAll('[x-model]')].forEach(e => {
-            const key = e.getAttribute('x-model');
-            if (component._data && component._data[key]) {
-                e.value = component._data[key].value;
-                e.oninput = () => {
-                    component._data[key].value = e.value;
-                }
-                effect(() => {
-                    e.value = component._data[key].value;
-                });
-
-            }
-        });
-        //const textNodes = component.$element.querySelectorAll('*:not([x-for] *)');
-        //get all textnodes not child of a node with x-for attribute
-        const textNodes = component.$element.querySelectorAll('*:not([x-for])');
-        for (const node of textNodes) {
-            for (const child of node.childNodes) {
-                if (child.nodeType === 3) {
-                    if (child.textContent.includes('{{')) {
-                        //ignore {{#each }} and {{/each}}
-                        if (child.textContent.includes('#each') || child.textContent.includes('/each')) {
-                            console.log('ignore each', child.textContent);
-                            continue;
-                        }
-                        const [textArr, reactiveIndexes] = prepareForReplace(child.textContent);
-                        effect(() => {
-                            replace(component, child, textArr, reactiveIndexes);
-                        });
-                    }
-                }
-            }
-        }
-        //add x-for
-        [...component.$element.querySelectorAll('[x-for]')].forEach(e => {
-            //x-for="item in items"
-            const parts = e.getAttribute('x-for').split(' in ');
-            const key = parts[1];
-            const itemkey = parts[0];
-
-            const parent = e.parentElement;
-            //check if "e" is a template tag
-            if (e.tagName == "TEMPLATE") {
-                //it should be something like 
-                /**
-                 * <template x-for="item in features">
-                 * <div>
-                        <li>{{item}}</li>
-                    <div>
-                    </template>
-                    
-                 */
-                const [textArr, reactiveIndexes] = prepareForReplace(e.content.firstElementChild.textContent);
-                effect(() => {
-                    if (component._data && component._data[key]) {
-                        const data = component._data[key].value;
-                        for (const d of data) {
-                            const clone = e.content.firstElementChild.cloneNode(true);
-                            //get only the children with {{}} and replace them
-                            const children = [...clone.childNodes].filter(child => child.textContent.includes('{{'));
-                            for (const child of children) {
-                                const [textArr, reactiveIndexes] = prepareForReplace(child.textContent);
-                                replace(component, child, textArr, reactiveIndexes, { [itemkey]: d });
-                            }
-                            parent.appendChild(clone.firstElementChild);
-                        }
-                    }
-                });
-                return;
-
-            }
-            //remove all nodes from parent
-            effect(() => {
-                const [textArr, reactiveIndexes] = prepareForReplace(e.textContent);
-                while (parent.firstChild) {
-                    parent.removeChild(parent.firstChild);
-                }
-                if (component._data && component._data[key]) {
-                    const data = component._data[key].value;
-                    for (const d of data) {
-                        const clone = e.cloneNode(true);
-                        clone.removeAttribute('x-for');
-                        replace(component, clone, textArr, reactiveIndexes, { [itemkey]: d });
-                        parent.appendChild(clone);
-                    }
-                }
-            });
-        });
+        bindNode(component.$element, component, {});
     }
+
+    // 9. Handle Scoped/Global CSS
     if (component.style && !styleTagsAdded.includes(component.compId)) {
-        let style = component.style;
-        if (typeof style == "function") {
-            style = style();
-        }
+        let style = typeof component.style === "function" ? component.style() : component.style;
         const styleTag = document.createElement('style');
         styleTag.innerHTML = style;
         document.head.appendChild(styleTag);
-        if (component.compId) {
-            styleTagsAdded.push(component.compId);
-        }
-
+        if (component.compId) styleTagsAdded.push(component.compId);
     }
-    //if component has a components property: { 'tag-name': component } then it should be rendered in the tag-name, it can have multiple components. if the component is just html then it should be replaced with the component
-    if (component.components) {
-        for (const key in component.components) {
-            let comp = component.components[key];
-            if (comp.template) {
-                const el = component.$element.querySelectorAll(key);
-                if (el) {
-                    console.log("the elements", key);
-                    el.forEach(e => {
-                        const props = {};
-                        for (const attr of e.attributes) {
-                            if (attr.nodeName.startsWith(':')) {
-                                props[attr.nodeName.substring(1)] = attr.nodeValue;
-                            }
-                        }
-                        const compInstance = createComponent(comp, undefined, props);
-                        e.replaceWith(compInstance.$element);
-                    })
-                }
-            } else {
 
-                const el = component.$element.querySelectorAll(key);
-                if (el) {
-                    el.forEach(e => {
-                        let newEl = comp;
-                        if (typeof comp == "function") {
-                            newEl = comp(e);
-                        }
-                        e.replaceWith(newEl);
-
-                    });
-                }
-            }
-        }
-    }
+    // 10. Init Lifecycle
     if (component.init) {
         component.init();
     }
+
     return component;
 }

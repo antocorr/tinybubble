@@ -1,5 +1,5 @@
-import { EventTopic } from "./EventTopic";
-import { getJobManager } from "./JobManager";
+import { EventTopic } from "./EventTopic.js";
+import { getJobManager } from "./JobManager.js";
 export class Bubble{
     events;
     $state = {};

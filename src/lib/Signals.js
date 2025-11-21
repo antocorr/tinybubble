@@ -6,8 +6,7 @@ let current;
  */
 export function createSignal(initialValue) {
     let value = initialValue;
-    const
-        subscribers = [];
+    const subscribers = new Set();
     function refresh() {
         subscribers.forEach(sub => sub())
     }
@@ -17,8 +16,8 @@ export function createSignal(initialValue) {
         refresh();
     }
     function get() {
-        if (current) {            
-            subscribers.push(current)
+        if (current) {
+            subscribers.add(current);
         }
         return value;
     }
@@ -29,27 +28,48 @@ export function effect(fn) {
     fn();
     current = null;
 }
-class SignalObject{
+export class SignalObject {
     get;
     set;
     refresh;
-    constructor(value){
+    constructor(value) {
         const [get, set, refresh] = createSignal(value);
         this.get = get;
         this.set = set;
         this.refresh = refresh;
     }
-    get value(){
+    get value() {
         return this.get();
     }
-    set value(newValue){
+    set value(newValue) {
         this.set(newValue);
     }
-    push(newValue){
+    push(newValue) {
         this.value.push(new SignalObject(newValue));
         this.refresh();
     }
 }
-export function Signal(value){
+export function Signal(value) {
     return new SignalObject(value);
+}
+
+export function computed(fn) {
+    const derived = new SignalObject();
+    effect(() => {
+        derived.value = fn();
+    });
+    return derived;
+}
+
+export function watch(source, cb) {
+    let oldValue;
+    let initialized = false;
+    effect(() => {
+        const val = typeof source === 'function' ? source() : source.value;
+        if (initialized) {
+            cb(val, oldValue);
+        }
+        oldValue = val;
+        initialized = true;
+    });
 }

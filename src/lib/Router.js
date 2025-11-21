@@ -76,13 +76,14 @@ export function createRouter({ mode = 'history', base = '/', routes = [] }) {
             outlet.innerHTML = '';
             if (match) {
                 // se è un oggetto SFC, usiamo createComponent
-                if (match.component.template) {
+                if (match.component.template)
+                {
                     let comp;
-                    if (match.persistent && componentMemory.has(match.path)) {
+                    if(match.persistent && componentMemory.has(match.path)) {
                         comp = componentMemory.get(match.path);
                     } else {
                         comp = createComponent(match.component);
-                        if (match.persistent) {
+                        if(match.persistent) {
                             componentMemory.set(match.path, comp);
                         }
                     }
