@@ -88,4 +88,11 @@ btn.onclick = () => {
 
 we are just testing shoelace support.
 
-example: https://antocorr.github.io/bubble/src/lib/examples/reactivity/shoelace.html
+basic example: https://antocorr.github.io/bubble/examples/reactivity/basic.html
+
+effect example: https://antocorr.github.io/bubble/examples/reactivity/effect.html
+
+example: https://antocorr.github.io/bubble/examples/reactivity/shoelace.html
+
+router: https://antocorr.github.io/bubble/examples/router/index.html
+
