@@ -14,13 +14,13 @@ export function html(markup) {
 const styleTagsAdded = [];
 
 /**
- * Replaces syntax sugar (@click -> -x-onclick)
+ * Replaces syntax sugar (@click -> -x-on:click)
+ * All @whatever are converted to -x-on:whatever; emit/native is decided later.
  */
 function bubblify(str) {
-    return str
-        .replace(/@click/g, '-x-onclick')
-        .replace(/@change/g, '-x-onchange')
-        .replace(/@input/g, '-x-oninput');
+    return str.replace(/@([a-zA-Z0-9_-]+)(\s*=)/g, (_, eventName, eq) => {
+        return `-x-on:${eventName}${eq}`;
+    });
 }
 
 /**
@@ -75,7 +75,6 @@ function evaluate(expression, scope, context = null, returnResult = true) {
         const values = validKeys.map(k => {
             return (scope[k] instanceof SignalObject) ? scope[k].value : scope[k];
         });
-
         return fn.apply(context, values);
     } catch (e) {
         // Suppress ReferenceError (treat as undefined) to avoid console noise for missing variables
@@ -220,15 +219,26 @@ function handleRefs(el, component) {
 
 function handleEvents(el, component, localScope) {
     [...el.attributes].forEach(attr => {
-        if (attr.name.startsWith('-x-on')) {
-            const eventName = attr.name.replace('-x-on', ''); // click, change...
+        if (attr.name.startsWith('-x-on:')) {
+            const eventName = attr.name.replace('-x-on:', ''); // click, change...
             const expr = attr.value;
-
+            let oldVal = el.value || undefined;
             el.addEventListener(eventName, (event) => {
                 // available in eval as $event
                 const currentScope = { ...component._methods, ...component._data, ...component.props, ...localScope };
                 const eventScope = { ...currentScope, $event: event };
-                evaluate(expr, eventScope, component, false);
+                if (typeof expr == "string" && !expr.includes(' ') && !expr.includes('(')) {
+                    if (typeof component[expr] == "function") {
+                        if (['input', 'change'].includes(eventName)) {
+                            component[expr](event.target.value, oldVal);
+                            oldVal = event.target.value;
+                        } else {
+                            component[expr](event);
+                        }
+                    }
+                } else {
+                    evaluate(expr, eventScope, component, false);
+                }
             });
         }
     });
@@ -244,7 +254,9 @@ function handleModel(el, component, localScope) {
             // Init
             el.value = signal.value;
             // DOM Listener
-            el.addEventListener('input', () => signal.value = el.value);
+            el.addEventListener('input', () => {
+                signal.value = el.value
+            });
             // Signal Listener
             effect(() => {
                 if (el.value !== signal.value) el.value = signal.value;
@@ -260,10 +272,42 @@ function handleCustomComponent(el, component, localScope) {
         const currentScope = { ...component._methods, ...component._data, ...component.props, ...localScope };
         const compDef = component.components[tagName];
         const childProps = { children: el.innerHTML };
+        const emitListeners = {};
+        const nativeEventBindings = [];
+        const componentEmits = Array.isArray(compDef.emits) ? compDef.emits : [];
         [...el.attributes].forEach(attr => {
             if (attr.name.startsWith(':')) {
                 // :prop="val" -> evaluate expression
                 childProps[attr.name.substring(1)] = evaluate(attr.value, currentScope, component);
+            } else if (attr.name.startsWith('-x-on:')) {
+                const eventName = attr.name.replace('-x-on:', '');
+                if (componentEmits.includes(eventName)) {
+                    if (!emitListeners[eventName]) emitListeners[eventName] = [];
+                    emitListeners[eventName].push((...args) => {
+                        const scoped = {
+                            ...component._methods,
+                            ...component._data,
+                            ...component.props,
+                            ...localScope,
+                            $event: args[0],
+                            $args: args
+                        };
+                        const expr = attr.value;
+                        if (typeof expr === "string" && !expr.includes(' ') && !expr.includes('(')) {
+                            if (typeof component[expr] === "function") {
+                                if (args.length === 1) {
+                                    component[expr](args[0]);
+                                } else {
+                                    component[expr](...args);
+                                }
+                                return;
+                            }
+                        }
+                        evaluate(expr, scoped, component, false);
+                    });
+                } else {
+                    nativeEventBindings.push({ eventName, expr: attr.value });
+                }
             } else {
                 // prop="val" -> static string
                 childProps[attr.name] = attr.value;
@@ -272,7 +316,24 @@ function handleCustomComponent(el, component, localScope) {
         if (boundElements.has(el)) {
             return;
         }
-        const childComp = createComponent(compDef, undefined, childProps);
+        const childComp = createComponent(compDef, undefined, childProps, component, emitListeners);
+        nativeEventBindings.forEach(({ eventName, expr }) => {
+            childComp.$element.addEventListener(eventName, (event) => {
+                const scope = { ...component._methods, ...component._data, ...component.props, ...localScope };
+                const eventScope = { ...scope, $event: event };
+                if (typeof expr == "string" && !expr.includes(' ') && !expr.includes('(')) {
+                    if (typeof component[expr] == "function") {
+                        if (['input', 'change'].includes(eventName)) {
+                            component[expr](event.target.value);
+                        } else {
+                            component[expr](event);
+                        }
+                    }
+                } else {
+                    evaluate(expr, eventScope, component, false);
+                }
+            });
+        });
         el.replaceWith(childComp.$element);
 
         // If it's a functional component (no internal state), we must bind it to the current scope
@@ -315,7 +376,7 @@ function handleTextNode(el, component, localScope) {
 // CORE: Recursive binding function (Traverse)
 // ============================================================
 
-function handleAttributes(el, component, localScope) {    
+function handleAttributes(el, component, localScope) {
     [...el.attributes].forEach(attr => {
         if (attr.name.startsWith(':')) {
             const attrName = attr.name.substring(1);
@@ -355,28 +416,28 @@ function bindNode(el, component, localScope) {
         // 4. Handle Refs
         handleRefs(el, component);
 
-        // 5. Handle Events (-x-onclick, -x-onchange, etc.)
+        // 5. Handle Events (-x-on:click, -x-on:change, etc.)
         handleEvents(el, component, localScope);
 
         // 6. Handle x-model
         handleModel(el, component, localScope);
 
         // 7. Handle Nested Components
-        if (el != component.$element) {   
-            if (handleCustomComponent(el, component, localScope)) { 
+        if (el != component.$element) {
+            if (handleCustomComponent(el, component, localScope)) {
                 boundElements.add(el);
                 return;
-            } 
+            }
         }
         boundElements.add(el);
         // 8. Handle Colon-Prefixed Attributes
         handleAttributes(el, component, localScope);
 
         // 9. Recursion on standard children
-        let child = el.firstChild;        
+        let child = el.firstChild;
         while (child) {
             const next = child.nextSibling;
-            bindNode(child, component, localScope);     
+            bindNode(child, component, localScope);
             child = next;
         }
     }
@@ -390,7 +451,9 @@ function bindNode(el, component, localScope) {
 /**
  * Creates the component
  */
-export function createComponent(original, data, _props) {
+export function createComponent(original, data, _props, parent = null, emitListeners = {}) {
+    const declaredProps = Array.isArray(original?.props) ? original.props : [];
+
     // 0. Handle Functional Components (e.g. RouterView, RouterLink)
     if (typeof original === 'function') {
         const el = original({ ...data, ..._props });
@@ -423,14 +486,25 @@ export function createComponent(original, data, _props) {
         ...data,
         props: {},
         _data: {}, // Internal reactive data
-        _methods: {} // Bound methods
+        _methods: {}, // Bound methods
+        _emitListeners: emitListeners || {},
+        parent
     };
 
-    // 3. Initialize Props as Signals
-    if (_props) {
-        for (const k in _props) {
-            component.props[k] = Signal(_props[k]);
+    component.emit = function (eventName, ...args) {
+        const listeners = this._emitListeners[eventName];
+        if (listeners) {
+            for (const fn of listeners) {
+                fn(...args);
+            }
         }
+    };
+
+    // 3. Initialize Props as Signals (include declared props even if not passed)
+    const incomingProps = _props || {};
+    const propKeys = new Set([...declaredProps, ...Object.keys(incomingProps)]);
+    for (const k of propKeys) {
+        component.props[k] = Signal(incomingProps[k]);
     }
 
     // 4. Initialize Data as Signals
@@ -440,7 +514,21 @@ export function createComponent(original, data, _props) {
         const merged = { ...initData, ...props };
 
         for (const key in merged) {
-            component._data[key] = Signal(merged[key]);
+            const signal = Signal(merged[key]);
+            Object.defineProperty(component._data, key, {
+                get() {
+                    return signal;
+                },
+                set(newVal) {
+                    if (newVal instanceof SignalObject) {
+                        signal.overwrite(newVal);
+                    } else {
+                        signal.value = newVal;
+                    }
+                },
+                enumerable: true,
+                configurable: true
+            });
         }
     }
 
