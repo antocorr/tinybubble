@@ -17,11 +17,11 @@ export function createRouter({ mode = 'history', base = '/', routes = [] }) {
         }
     }
 
-    const [getPath, setPath] = createSignal(getLocation());
+    const [getDestination, setDestination] = createSignal(getLocation());
 
     // quando cambia la history/hash, aggiorna il segnale
     const popEvt = mode === 'hash' ? 'hashchange' : 'popstate';
-    window.addEventListener(popEvt, () => setPath(getLocation()));
+    window.addEventListener(popEvt, () => setDestination(getLocation()));
 
     // funzione per navigare via JS
     function navigate(to) {
@@ -33,7 +33,7 @@ export function createRouter({ mode = 'history', base = '/', routes = [] }) {
             window.location.hash = to;
         } else {
             history.pushState(null, '', full);
-            setPath(getLocation());
+            setDestination(getLocation());
         }
     }
     function RouterLink(obj) {
@@ -69,10 +69,9 @@ export function createRouter({ mode = 'history', base = '/', routes = [] }) {
     function RouterView() {
         const outlet = html(`<div></div>`);
         effect(() => {
-            const current = getPath();
+            const current = getDestination();
             // troviamo la prima route che “matcha” (qui solo path esatti)
             const match = routes.find(r => r.path === current);
-            console.log('current', current, 'match', match);
             outlet.innerHTML = '';
             if (match) {
                 // se è un oggetto SFC, usiamo createComponent
@@ -82,7 +81,7 @@ export function createRouter({ mode = 'history', base = '/', routes = [] }) {
                     if(match.persistent && componentMemory.has(match.path)) {
                         comp = componentMemory.get(match.path);
                     } else {
-                        comp = createComponent(match.component);
+                        comp = createComponent(match.component, match.data || null);
                         if(match.persistent) {
                             componentMemory.set(match.path, comp);
                         }
@@ -98,5 +97,5 @@ export function createRouter({ mode = 'history', base = '/', routes = [] }) {
         return outlet;
     }
 
-    return { navigate, RouterLink, RouterView, routes };
+    return { navigate, RouterLink, RouterView, routes, setDestination, getDestination };
 }

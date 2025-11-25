@@ -145,9 +145,23 @@ function handleFor(el, component, localScope, bindNodeFn) {
                     const scoped = indexKey
                         ? { ...localScope, [itemKey]: itemData, [indexKey]: idx }
                         : { ...localScope, [itemKey]: itemData };
-                    bindNodeFn(child, component, scoped);
+                    // Insert before binding so custom components have a parent (replaceWith needs it)
                     parent.insertBefore(child, anchor);
-                    renderedItems.push(child);
+                    bindNodeFn(child, component, scoped);
+
+                    // Track the actual node now in the DOM (may differ if replaced)
+                    let tracked = child;
+                    if (!tracked.isConnected || tracked.parentNode !== parent) {
+                        const candidate = anchor.previousSibling;
+                        if (candidate && candidate !== anchor && candidate.parentNode === parent) {
+                            tracked = candidate;
+                        } else {
+                            tracked = null;
+                        }
+                    }
+                    if (tracked && !renderedItems.includes(tracked)) {
+                        renderedItems.push(tracked);
+                    }
                 });
             });
         }

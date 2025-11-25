@@ -9,6 +9,6 @@ export const router = createRouter({
     routes: [
         { path: '/', component: Home },
         { path: '/about', component: About },
-        { path: '/persistent-home', component: Home, persistent: true },
+        { path: '/persistent-home', component: Home, persistent: true, data: { props: { addTitle: 'Is Persistent!'}  }},
     ]
 });

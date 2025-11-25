@@ -7,7 +7,8 @@ export default {
       <section class="home-page p-6 max-w-2xl mx-auto">
         <h1 class="text-3xl font-bold mb-4">👋 Welcome to Bubble!</h1>
         <p class="mb-6">
-          This is your main page, ready to be expanded just like in Vue, React, or Angular.
+          This is your main page, ready to be expanded just like in Vue, React, or Angular.<br/>
+          {{ addTitle }}
         </p>
 
         <div class="mb-6">

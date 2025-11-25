@@ -1,5 +1,5 @@
 # BubbleJs
-A micro (less than **4kb** gzipped ) reactive vanilla javascript library based on Singals and pub sub.
+A micro (less than **4kb** gzipped ) reactive vanilla javascript library based on Signals and pub sub.
 
 ## Import the library
 ### As a ES-6 module (recommended) from CDN
@@ -87,6 +87,8 @@ btn.onclick = () => {
 ## Component library support
 
 we are just testing shoelace support.
+
+## Examples
 
 basic example: https://antocorr.github.io/bubble/examples/reactivity/basic.html
 
