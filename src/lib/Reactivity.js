@@ -237,7 +237,10 @@ function handleEvents(el, component, localScope) {
                         }
                     }
                 } else {
-                    evaluate(expr, eventScope, component, false);
+                    const res = evaluate(expr, eventScope, component);
+                    if (typeof res === 'function') {
+                        res(event);
+                    }
                 }
             });
         }
@@ -278,7 +281,14 @@ function handleCustomComponent(el, component, localScope) {
         [...el.attributes].forEach(attr => {
             if (attr.name.startsWith(':')) {
                 // :prop="val" -> evaluate expression
-                childProps[attr.name.substring(1)] = evaluate(attr.value, currentScope, component);
+                const expr = attr.value.trim();
+                // If the expression is a bare identifier that resolves to a SignalObject,
+                // forward the signal itself instead of its current value so children can bind to it.
+                if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(expr) && currentScope[expr] instanceof SignalObject) {
+                    childProps[attr.name.substring(1)] = currentScope[expr];
+                } else {
+                    childProps[attr.name.substring(1)] = evaluate(attr.value, currentScope, component);
+                }
             } else if (attr.name.startsWith('-x-on:')) {
                 const eventName = attr.name.replace('-x-on:', '');
                 if (componentEmits.includes(eventName)) {
@@ -303,7 +313,10 @@ function handleCustomComponent(el, component, localScope) {
                                 return;
                             }
                         }
-                        evaluate(expr, scoped, component, false);
+                        const res = evaluate(expr, scoped, component);
+                        if (typeof res === 'function') {
+                            res(...args);
+                        }
                     });
                 } else {
                     nativeEventBindings.push({ eventName, expr: attr.value });
@@ -330,7 +343,10 @@ function handleCustomComponent(el, component, localScope) {
                         }
                     }
                 } else {
-                    evaluate(expr, eventScope, component, false);
+                    const res = evaluate(expr, eventScope, component);
+                    if (typeof res === 'function') {
+                        res(event);
+                    }
                 }
             });
         });
@@ -504,7 +520,8 @@ export function createComponent(original, data, _props, parent = null, emitListe
     const incomingProps = _props || {};
     const propKeys = new Set([...declaredProps, ...Object.keys(incomingProps)]);
     for (const k of propKeys) {
-        component.props[k] = Signal(incomingProps[k]);
+        const incoming = incomingProps[k];
+        component.props[k] = incoming instanceof SignalObject ? incoming : Signal(incoming);
     }
 
     // 4. Initialize Data as Signals
@@ -521,7 +538,7 @@ export function createComponent(original, data, _props, parent = null, emitListe
                 },
                 set(newVal) {
                     if (newVal instanceof SignalObject) {
-                        signal.overwrite(newVal);
+                        signal.overwrite(newVal, key);
                     } else {
                         signal.value = newVal;
                     }

@@ -45,8 +45,24 @@ export class SignalObject {
         this.set(newValue);
     }
     push(newValue) {
-        this.value.push(new SignalObject(newValue));
+        this.value.push(newValue);
         this.refresh();
+    }
+    pushSignal(newValue) {
+        const signal = new SignalObject(newValue);
+        this.push(signal);
+        return signal;
+    }
+    overwrite(newSignalObject, key) {
+        if (!(newSignalObject instanceof SignalObject)) return;
+        // Remember current subscribers so we can re-run them and re-bind to the new signal
+        const previousRefresh = this.refresh;
+        // Proxy this signal's internals to the incoming signal
+        this.get = () => newSignalObject.get();
+        this.set = (v) => newSignalObject.set(v);
+        this.refresh = () => newSignalObject.refresh();
+        // Re-run existing subscribers once so they attach to the new signal
+        previousRefresh();
     }
 }
 export function Signal(value) {
