@@ -11,10 +11,11 @@ export default {
         </p>
 
         <div class="mb-6">
+          <div class="mb-4">You can use -x-on:click or @click for events!</div>
           <span class="font-semibold">Visits:</span>
-          <span>{{ visits }}</span>
+          <span>{{ visits }}</span>          
           <button
-            -x-onclick="this.incrementVisits()"
+            -x-on:click="this.incrementVisits()"
             class="ml-2 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
           >
             Add Visit
