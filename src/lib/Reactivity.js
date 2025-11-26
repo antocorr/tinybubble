@@ -234,10 +234,18 @@ function handleRefs(el, component) {
 function handleEvents(el, component, localScope) {
     [...el.attributes].forEach(attr => {
         if (attr.name.startsWith('-x-on:')) {
-            const eventName = attr.name.replace('-x-on:', ''); // click, change...
+            let eventName = attr.name.replace('-x-on:', ''); // click, change...
             const expr = attr.value;
             let oldVal = el.value || undefined;
+            let prevent = false;
+            if (eventName.includes('-prevent')) {
+                prevent = true;
+                eventName = eventName.replace('-prevent', '').trim();
+            }
             el.addEventListener(eventName, (event) => {
+                if (prevent) {
+                    event.preventDefault();
+                }
                 // available in eval as $event
                 const currentScope = { ...component._methods, ...component._data, ...component.props, ...localScope };
                 const eventScope = { ...currentScope, $event: event };

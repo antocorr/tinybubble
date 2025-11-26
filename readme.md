@@ -1,5 +1,5 @@
 # BubbleJs
-A micro (less than **4kb** gzipped ) reactive vanilla javascript library based on Signals and pub sub.
+A micro (less than **4kb** gzipped ) reactive vanilla javascript UI component library based on Signals and pub sub.
 
 ## Import the library
 ### As a ES-6 module (recommended) from CDN
@@ -98,3 +98,14 @@ example: https://antocorr.github.io/bubble/examples/reactivity/shoelace.html
 
 router: https://antocorr.github.io/bubble/examples/router/index.html
 
+## AI FRIENDLY
+
+Being small and relatively simple (the minified version is just 3k tokens) and by pairing it with tailwind you can create all sort of components usin any LLM.
+
+There is also a prompt ready to use here
+
+https://github.com/antocorr/bubble/blob/main/ai-component-creation-prompt.md
+
+And this a test I made using GPT 5.1
+
+https://antocorr.github.io/bubble/examples/ai-bakery.html

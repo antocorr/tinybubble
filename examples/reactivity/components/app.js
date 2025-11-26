@@ -1,6 +1,7 @@
 import { createComponent, watch } from "../../../src/index.js";
 // import { createComponent } from "../../../dist/bubble.js";
 import Select from "./form/Select.js";
+import Toggle from "./form/Toggle.js";
 const App = {
     template() {
         /* html */
@@ -23,6 +24,8 @@ const App = {
             <x-select :items="[{ text: 'Canada', value: 'CA'}, { text: 'France', value: 'FR'}, { text: 'Italy', value: 'IT'}]" @change="selectChange" placeholder="Select country" :model-val="country1" label="Country"></x-select>
             <x-select :items="[{ text: 'New Mexico', value: 'NMX'}, { text: 'Florida', value: 'FL'}, { text: 'California', value: 'CA'}]" @change="(x, y) => selectChange2(x, y, name)"></x-select>
             <x-select :items="[{ text: 'Germany', value: 'DE'}, { text: 'England', value: 'GB'}, { text: 'Sicily', value: 'SI'}]" default="GB" :model-val="country2"></x-select>
+            <x-toggle label="toggle" class="mb-4" @change="switchChange"></x-toggle>
+            <x-toggle label="toggle2"  :model-val="switchValue"></x-toggle>
             <!-- add a list -->
             <div class="mt-4">
                 <ul>
@@ -35,7 +38,8 @@ const App = {
         </div>`
     },
     components: {
-        'x-select': Select
+        'x-select': Select,
+        'x-toggle': Toggle
     },
     data() {
         return {
@@ -45,7 +49,8 @@ const App = {
             items: ['do laundry', "repair the car"],
             newItem: '',
             country1: 'CA',
-            country2: 'DE'
+            country2: 'DE',
+            switchValue: true,            
         }
     },
     selectChange2(x, y, name) {
@@ -61,6 +66,9 @@ const App = {
     },
     increment() {
         this._data.counter.value++;
+    },
+    switchChange(v) {
+        console.log("new value", v)
     },
     addItem() {
         if (!this._data.newItem.value) {
