@@ -7,7 +7,7 @@
     "example": "examples"
   },
   "scripts": {
-    "build": "esbuild ./src/index.js --bundle --sourcemap --minify --format=esm --outfile=./dist/bubble.js",
+    "build": "esbuild ./src/index.js --bundle --sourcemap --minify --format=esm --outfile=./dist/bubble.js; esbuild ./src/index-events.js --bundle --sourcemap --minify --format=esm --outfile=./dist/bubble-events.js; esbuild ./src/index-full.js --bundle --sourcemap --minify --format=esm --outfile=./dist/bubble-full.js",
     "build-no-min": "esbuild ./src/index.js --bundle --sourcemap --format=esm --outfile=./dist/bubble.js"
   },
   "author": "",

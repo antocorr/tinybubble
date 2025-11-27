@@ -1,5 +1,5 @@
 # BubbleJs
-A micro (less than **4kb** gzipped ) reactive vanilla javascript UI component library based on Signals and pub sub.
+A micro (less than **4kb** gzipped ) reactive vanilla javascript UI component **standalone** library based on Signals and pub sub.
 
 ## Import the library
 ### As a ES-6 module (recommended) from CDN
@@ -16,7 +16,7 @@ npm i https://github.com/antocorr/bubble
 
 ## Using the library
 
-### Vue Single File component style
+### Vue/React Single File component style
 
 
 ```javascript
@@ -84,9 +84,102 @@ btn.onclick = () => {
 }
 ```
 
-## Component library support
+## HTML Component library support
 
 we are just testing shoelace support.
+
+### Comes with pub sub utilities to cross notify components
+
+Use the built-in event bus when you need two components to talk without a direct parent/child relationship. Create a topic, emit events with a payload, and listen from any other component to keep things decoupled.
+
+```javascript
+//in any component, parent, children, sibling
+import { bubble } from "../yourpath-to-bubble/bubble-events.js";
+
+bubble.topic('layout').emit('resize', 'small');
+
+//in any other component for example Sidebar.js
+
+bubble.topic("layout").on('resize', (size) => {
+    if(size == 'small'){
+        hideSecondaryLinks();
+    }
+})
+
+```
+
+### Easy routing included
+
+Bubble ships with a tiny router so you can wire navigation without extra deps. Declare your routes, drop `<router-link>` and `<router-view>` into your layout, and Bubble handles hash/history navigation plus optional persistent pages.
+
+```javascript
+// router.js
+import { createRouter } from "bubble";
+import Home from "./pages/Home.js";
+import About from "./pages/About.js";
+
+export const router = createRouter({
+  mode: "hash",
+  routes: [
+    { path: "/", component: Home },
+    { path: "/about", component: About },
+    // keep this page warm in memory when you leave it
+    { path: "/dashboard", component: Home, persistent: true },
+  ],
+});
+```
+
+```javascript
+// App.js
+import { createComponent } from "bubble";
+import { router } from "./router.js";
+
+export default {
+  name: "App",
+  template() {
+    /*html*/
+    return `
+      <nav>
+        <router-link to="/">Home</router-link>
+        <router-link to="/about">About</router-link>
+        <router-link to="/dashboard">Dashboard</router-link>
+      </nav>
+      <main>
+        <router-view/>
+      </main>
+    `;
+  },
+  components: {
+    "router-link": router.RouterLink,
+    "router-view": router.RouterView,
+  },
+};
+```
+
+### Component lazy loading
+
+Keep the bundle tiny by loading components only when needed. You can lazy load router pages via a `src` property, or manually import any component at runtime with `importComponent`.
+
+```javascript
+// Lazy route: only fetched when the user navigates to /async
+export const router = createRouter({
+  routes: [
+    { path: "/", component: Home },
+    { path: "/async", src: "./pages/AsyncPage.js" },
+  ],
+});
+```
+
+```javascript
+// Lazy widget anywhere else
+import { importComponent } from "bubble";
+
+async function mountWidget(host) {
+  const src = new URL("./components/ChartWidget.js", import.meta.url).href;
+  const widget = await importComponent(src);
+  widget.appendTo(host);
+}
+```
 
 ## Examples
 

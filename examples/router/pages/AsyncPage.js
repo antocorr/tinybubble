@@ -94,10 +94,10 @@ comp.appendTo(host);
             status: 'Idle — ready to load.',
             log: [],
             points: [
-                'Routes can declare a `src` pointing to a module instead of embedding the component.',
+                'Routes can declare a "src" pointing to a module instead of embedding the component.',
                 'The router resolves that path relative to the router config file and imports it when matched.',
                 'After the import finishes, the default export is treated like a normal Bubble component.',
-                'Combine `persistent: true` with async routes to keep once-loaded pages warm in memory.',
+                'Combine "persistent: true" with async routes to keep once-loaded pages warm in memory.',
             ],
             childLoading: false,
             childLoaded: false,
