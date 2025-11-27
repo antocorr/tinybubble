@@ -31,6 +31,10 @@ const App = {
       {
         destination: '/persistent-home',
         title: 'Persistent Home'
+      },
+      {
+        destination: '/async',
+        title: 'Async route'
       }]
     }
   },

@@ -423,7 +423,15 @@ function handleAttributes(el, component, localScope) {
                 const currentScope = { ...component._methods, ...component._data, ...component.props, ...localScope };
                 const val = evaluate(expr, currentScope, component);
                 if (val !== undefined && val !== null) {
-                    el.setAttribute(attrName, val);
+                    if (['disabled'].includes(attrName)) {
+                        if (val === false) {
+                            el.removeAttribute(attrName);
+                        } else {
+                            el.setAttribute(attrName, val);
+                        }
+                    } else {                        
+                        el.setAttribute(attrName, val);
+                    }
                 } else {
                     el.removeAttribute(attrName);
                 }
@@ -627,4 +635,36 @@ export function createComponent(original, data, _props, parent = null, emitListe
     }
 
     return component;
+}
+/**
+ * @type {{[src:string] : Component}} componentCache es componentCache['../abc/] = Commponent
+ */
+const componentCache = {};
+function resolveSrc(src) {
+    // Allow absolute URLs or protocol-relative imports to pass through
+    const isAbsolute = /^(?:[a-z]+:)?\/\//i.test(src);
+    if (isAbsolute) return src;
+    try {
+        return new URL(src).href;
+    } catch (e) {
+        return src;
+    }
+}
+export async function importComponent(src, data, _props, parent = null, emitListeners = {}) {
+    let comp = { appendTo: () => { }, $element: document.createElement('div') };
+    try {
+        src = resolveSrc(src);
+        let compModule = componentCache[src];
+        if (!compModule) {            
+            compModule = await import(src);
+            componentCache[src] = compModule;
+        }
+        const compDefinition = compModule?.default || compModule;
+        if (compDefinition) {
+            comp = createComponent(compDefinition, data, _props, parent, emitListeners);
+        }
+    } catch (e) {
+        console.warn("Error importing component!");
+    }
+    return comp;
 }

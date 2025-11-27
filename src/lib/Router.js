@@ -1,7 +1,21 @@
 // bubble-router.js
 import { html, effect, createSignal, createComponent } from '../index.js';
 
-export function createRouter({ mode = 'history', base = '/', routes = [] }) {
+export function createRouter({ mode = 'history', base = '/', routes = [], srcBase = null }) {
+    const resolvedSrcBase = srcBase
+        || (typeof document !== 'undefined' && document.currentScript ? document.currentScript.src : null)
+        || (typeof window !== 'undefined' ? window.location.href : null);
+
+    function resolveRouteSrc(src) {
+        // Allow absolute URLs or protocol-relative imports to pass through
+        const isAbsolute = /^(?:[a-z]+:)?\/\//i.test(src);
+        if (isAbsolute) return src;
+        try {
+            return new URL(src, resolvedSrcBase || undefined).href;
+        } catch (e) {
+            return src;
+        }
+    }
     // normalizza un path in relazione al base
     function stripBase(path) {
         if (!base || base === '/') return path;
@@ -65,34 +79,40 @@ export function createRouter({ mode = 'history', base = '/', routes = [] }) {
         return RouterLink({ to, children, ...attrs });
     }
     const componentMemory = new Map();
-    // componete <RouterView/>
+    // component <RouterView/>
     function RouterView() {
         const outlet = html(`<div></div>`);
-        effect(() => {
+        effect(async () => {
             const current = getDestination();
-            // troviamo la prima route che “matcha” (qui solo path esatti)
             const match = routes.find(r => r.path === current);
             outlet.innerHTML = '';
             if (match) {
-                // se è un oggetto SFC, usiamo createComponent
-                if (match.component.template)
-                {
+                if (match.src && !match.component) {
+                    try {
+                        const src = resolveRouteSrc(match.src);
+                        const compModule = await import(src);
+                        match.component = compModule.default || compModule;
+                    } catch (e) {
+                        return outlet;
+                    }
+                }
+                if (typeof match.component != "function" && match.component.template) {
                     let comp;
-                    if(match.persistent && componentMemory.has(match.path)) {
+                    if (match.persistent && componentMemory.has(match.path)) {
                         comp = componentMemory.get(match.path);
                     } else {
                         comp = createComponent(match.component, match.data || null);
-                        if(match.persistent) {
+                        if (match.persistent) {
                             componentMemory.set(match.path, comp);
                         }
                     }
                     outlet.appendChild(comp.$element);
-                }
-                // altrimenti se è funzione di tipo signal
-                else {
+                } else {
                     outlet.appendChild(match.component());
                 }
+                return outlet;
             }
+            return outlet;
         });
         return outlet;
     }
