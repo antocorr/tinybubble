@@ -10,8 +10,11 @@ export function createSignal(initialValue) {
     function refresh() {
         subscribers.forEach(sub => sub())
     }
-    function
-        set(newValue) {
+function
+    set(newValue) {
+        if (Object.is(newValue, value)) {
+            return;
+        }
         value = newValue;
         refresh();
     }
@@ -55,6 +58,7 @@ export class SignalObject {
     }
     overwrite(newSignalObject, key) {
         if (!(newSignalObject instanceof SignalObject)) return;
+        if (newSignalObject == this) return;
         // Remember current subscribers so we can re-run them and re-bind to the new signal
         const previousRefresh = this.refresh;
         // Proxy this signal's internals to the incoming signal

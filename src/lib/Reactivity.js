@@ -89,7 +89,7 @@ function evaluate(expression, scope, context = null, returnResult = true) {
 // DIRECTIVE HANDLERS
 // ============================================================
 
-function handleFor(el, component, localScope, bindNodeFn) {
+export function handleFor(el, component, localScope, bindNodeFn) {
     if (!el.hasAttribute('x-for')) return false;
 
     const attr = el.getAttribute('x-for'); // "item in items"
@@ -132,8 +132,7 @@ function handleFor(el, component, localScope, bindNodeFn) {
         if (Array.isArray(list)) {
             list.forEach((itemData, idx) => {
                 // Clone the template
-                const clone = templateContent.cloneNode(true);
-
+                const clone = templateContent.cloneNode(true);               
                 // If it was a template tag, cloneNode returns a DocumentFragment
                 // We must iterate its children to apply binding
                 // If it was a regular element, clone is the element itself
@@ -142,12 +141,13 @@ function handleFor(el, component, localScope, bindNodeFn) {
 
                 nodesToInsert.forEach(child => {
                     // Pass single item to scope
-                    const scoped = indexKey
-                        ? { ...localScope, [itemKey]: itemData, [indexKey]: idx }
-                        : { ...localScope, [itemKey]: itemData };
+                    const scoped = indexKey ? { ...localScope, [itemKey]: itemData, [indexKey]: idx } : { ...localScope, [itemKey]: itemData };                    
+                    child._$localScope = scoped;
                     // Insert before binding so custom components have a parent (replaceWith needs it)
                     parent.insertBefore(child, anchor);
-                    bindNodeFn(child, component, scoped);
+                    if (bindNodeFn) {
+                        bindNodeFn(child, component, scoped);
+                    }
 
                     // Track the actual node now in the DOM (may differ if replaced)
                     let tracked = child;
@@ -429,7 +429,7 @@ function handleAttributes(el, component, localScope) {
                         } else {
                             el.setAttribute(attrName, val);
                         }
-                    } else {                        
+                    } else {
                         el.setAttribute(attrName, val);
                     }
                 } else {
@@ -655,7 +655,7 @@ export async function importComponent(src, data, _props, parent = null, emitList
     try {
         src = resolveSrc(src);
         let compModule = componentCache[src];
-        if (!compModule) {            
+        if (!compModule) {
             compModule = await import(src);
             componentCache[src] = compModule;
         }
