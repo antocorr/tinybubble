@@ -1,17 +1,16 @@
 let current;
 /**
- * 
- * @param {*} initialValue 
+ *
+ * @param {*} initialValue
  * @returns {[function(): *, function(*): void, function(): void]}
  */
 export function createSignal(initialValue) {
     let value = initialValue;
     const subscribers = new Set();
     function refresh() {
-        subscribers.forEach(sub => sub())
+        subscribers.forEach((sub) => sub());
     }
-function
-    set(newValue) {
+    function set(newValue) {
         if (Object.is(newValue, value)) {
             return;
         }
@@ -24,7 +23,7 @@ function
         }
         return value;
     }
-    return [get, set, refresh]
+    return [get, set, refresh];
 }
 export function effect(fn) {
     current = fn;
@@ -40,6 +39,9 @@ export class SignalObject {
         this.get = get;
         this.set = set;
         this.refresh = refresh;
+    }
+    toJSON() {
+        return this.value;
     }
     get value() {
         return this.get();
@@ -85,7 +87,7 @@ export function watch(source, cb) {
     let oldValue;
     let initialized = false;
     effect(() => {
-        const val = typeof source === 'function' ? source() : source.value;
+        const val = typeof source === "function" ? source() : source.value;
         if (initialized) {
             cb(val, oldValue);
         }
