@@ -78,13 +78,49 @@ export function createRouter({ mode = 'history', base = '/', routes = [], srcBas
         });
         return RouterLink({ to, children, ...attrs });
     }
+    // Helper: converte path "/user/:id" in regex e estrae parametri
+    function matchRoute(routePath, currentPath) {
+        // Se non ci sono parametri dinamici, match esatto
+        if (!routePath.includes(':')) {
+            return routePath === currentPath ? { params: {} } : null;
+        }
+        
+        const paramNames = [];
+        const regexPath = routePath.replace(/:([^/]+)/g, (_, key) => {
+            paramNames.push(key);
+            return '([^/]+)';
+        });
+
+        const match = currentPath.match(new RegExp(`^${regexPath}$`));
+        if (!match) return null;
+
+        const params = {};
+        match.slice(1).forEach((val, i) => {
+            params[paramNames[i]] = val;
+        });
+        return { params };
+    }
+
     const componentMemory = new Map();
     // component <RouterView/>
     function RouterView() {
         const outlet = html(`<div></div>`);
         effect(async () => {
             const current = getDestination();
-            const match = routes.find(r => r.path === current);
+            
+            // Trova la rotta corrispondente
+            let match = null;
+            let params = {};
+            
+            for (const r of routes) {
+                const m = matchRoute(r.path, current);
+                if (m) {
+                    match = r;
+                    params = m.params;
+                    break;
+                }
+            }
+
             outlet.innerHTML = '';
             if (match) {
                 if (match.src && !match.component) {
@@ -96,19 +132,42 @@ export function createRouter({ mode = 'history', base = '/', routes = [], srcBas
                         return outlet;
                     }
                 }
+                
+                // Crea l'oggetto $route da iniettare
+                const $route = {
+                    path: current,
+                    params: params,
+                    query: Object.fromEntries(new URLSearchParams(window.location.search))
+                };
+
                 if (typeof match.component != "function" && match.component.template) {
                     let comp;
                     if (match.persistent && componentMemory.has(match.path)) {
                         comp = componentMemory.get(match.path);
+                        // Aggiorna $route se il componente è persistente
+                        if (comp.props.$route) {
+                            comp.props.$route.value = $route;
+                        }
+                        comp.$route = $route;
                     } else {
-                        comp = createComponent(match.component, match.data || null);
+                        // Passa $route sia in data (per init) che in props (per template)
+                        const instanceData = { ...(match.data || {}), $route };
+                        comp = createComponent(match.component, instanceData, { $route });
+                        
+                        // Aggiunge getter this.$route per accesso reattivo dal codice (sovrascrive la prop statica)
+                        Object.defineProperty(comp, '$route', {
+                            get() { return this.props.$route ? this.props.$route.value : undefined; },
+                            configurable: true
+                        });
+
                         if (match.persistent) {
                             componentMemory.set(match.path, comp);
                         }
                     }
                     outlet.appendChild(comp.$element);
                 } else {
-                    outlet.appendChild(match.component());
+                    // Componente funzionale
+                    outlet.appendChild(match.component({ $route }));
                 }
                 return outlet;
             }

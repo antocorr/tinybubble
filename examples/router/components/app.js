@@ -35,7 +35,16 @@ const App = {
       {
         destination: '/async',
         title: 'Async route'
-      }]
+      },
+      {
+        destination: '/user/1',
+        title: 'User 1'
+      },
+      {
+        destination: '/user/2',
+        title: 'User 2'
+      }
+    ]
     }
   },
   components: {
