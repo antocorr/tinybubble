@@ -561,21 +561,7 @@ export function createComponent(original, data, _props, parent = null, emitListe
         const merged = { ...initData, ...props };
 
         for (const key in merged) {
-            const signal = Signal(merged[key]);
-            Object.defineProperty(component._data, key, {
-                get() {
-                    return signal;
-                },
-                set(newVal) {
-                    if (newVal instanceof SignalObject) {
-                        signal.overwrite(newVal, key);
-                    } else {
-                        signal.value = newVal;
-                    }
-                },
-                enumerable: true,
-                configurable: true
-            });
+            component._data[key] = Signal(merged[key]);            
         }
     }
 
