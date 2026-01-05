@@ -100,10 +100,22 @@ export class SignalObject {
              this.refresh();
         }
     }
-
     // Proxy-like methods to maintain compatibility or ease of use
     toJSON() {
         return this.value;
+    }
+    toString() {
+        return String(this.value);
+    }
+    toBoolean() {
+        return Boolean(this.value);
+    }
+    valueOf() {
+        return this.value;
+    }
+
+    get length() {
+        return this.value?.length;
     }
 }
 

@@ -1,4 +1,5 @@
 import { effect, Signal, SignalObject } from "./Signals.js";
+import { evaluate } from "./Evaluate.js";
 
 /**
  * Create an HTML element from a string
@@ -40,50 +41,7 @@ function prepareForReplace(txt) {
     return [textArr, reactiveIndexes];
 }
 
-const fnCache = new Map();
 
-/**
- * Helper to evaluate JS expressions within the data context
- * Ex: "count > 5" or "isShow"
- */
-function evaluate(expression, scope, context = null, returnResult = true) {
-    try {
-        // Replace 'this' with '__component__' to allow safe access to component properties
-        // This avoids using 'with' or 'eval' while supporting 'this.prop' syntax
-        const keys = Object.keys(scope);
-        // Filter keys to ensure they are valid JS identifiers AND appear in the expression
-        const validKeys = keys.filter(k => {
-            return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k) && new RegExp(`\\b${k}\\b`).test(expression);
-        });
-
-        // Cache Key: Expression + keys (sorted to ensure consistency)
-        // We sort validKeys in place, so subsequent usage (map, new Function) uses the sorted order
-        validKeys.sort();
-        const cacheKey = expression + '::' + validKeys.join(',');
-
-        let fn = fnCache.get(cacheKey);
-
-        if (!fn) {
-            // Create function using destructuring-like approach (arguments)
-            // 'this' is supported via .apply()
-            const body = returnResult ? `return ${expression};` : `${expression};`;
-            fn = new Function(...validKeys, body);
-            fnCache.set(cacheKey, fn);
-        }
-
-        // Extract values in the same order as keys
-        const values = validKeys.map(k => {
-            return (scope[k] instanceof SignalObject) ? scope[k].value : scope[k];
-        });
-        return fn.apply(context, values);
-    } catch (e) {
-        // Suppress ReferenceError (treat as undefined) to avoid console noise for missing variables
-        if (!(e instanceof ReferenceError)) {
-            console.warn(`Error evaluating expression "${expression}":`, e);
-        }
-        return undefined;
-    }
-}
 
 // ============================================================
 // DIRECTIVE HANDLERS
@@ -93,7 +51,7 @@ export function handleFor(el, component, localScope, bindNodeFn) {
     if (!el.hasAttribute('x-for')) return false;
 
     const attr = el.getAttribute('x-for'); // "item in items"
-    const [rawItemKey, listKey] = attr.split(' in ').map(s => s.trim());
+    const [rawItemKey, listExpr] = attr.split(' in ').map(s => s.trim());
     let itemKey = rawItemKey;
     let indexKey = null;
 
@@ -125,9 +83,9 @@ export function handleFor(el, component, localScope, bindNodeFn) {
         // Construct scope lazily
         const currentScope = { ...component._methods, ...component._data, ...component.props, ...localScope };
 
-        // Get array from data
-        const listSignal = currentScope[listKey];
-        const list = listSignal ? (listSignal instanceof SignalObject ? listSignal.value : listSignal) : [];
+        // Resolve list expression via evaluate for consistency with other bindings
+        let list = listExpr ? evaluate(listExpr, currentScope, component) : [];
+        if (list instanceof SignalObject) list = list.value;
 
         if (Array.isArray(list)) {
             list.forEach((itemData, idx) => {
@@ -195,12 +153,26 @@ function handleIf(el, component, localScope, bindNodeFn) {
                 if (!isTemplate) clone.removeAttribute('x-if');
                 const nodesToInsert = isTemplate ? [...clone.childNodes] : [clone];
 
+                const inserted = [];
                 nodesToInsert.forEach(child => {
-                    bindNodeFn(child, component, localScope);
                     anchor.parentNode.insertBefore(child, anchor);
+                    bindNodeFn(child, component, localScope);
+                    // Track the actual node in case binding replaced it
+                    let tracked = child;
+                    if (!tracked.isConnected || tracked.parentNode !== anchor.parentNode) {
+                        const candidate = anchor.previousSibling;
+                        if (candidate && candidate !== anchor && candidate.parentNode === anchor.parentNode) {
+                            tracked = candidate;
+                        } else {
+                            tracked = null;
+                        }
+                    }
+                    if (tracked && !inserted.includes(tracked)) {
+                        inserted.push(tracked);
+                    }
                 });
                 // Keep track for removal
-                renderedNode = nodesToInsert;
+                renderedNode = inserted;
             }
         } else {
             if (renderedNode) {
@@ -493,10 +465,17 @@ function bindNode(el, component, localScope) {
         handleTextNode(el, component, localScope);
     }
 }
+function createProps(propKeys, incoming) {
+    //proxy, incoming is the data passed to the component, most of the time it's undefined/empty
+    //if an updated prop is a signalobject it must be unwrapped, we should alway work with the original data
+
+}
 
 /**
  * Creates the component
  */
+
+
 export function createComponent(original, data, _props, parent = null, emitListeners = {}) {
     const declaredProps = Array.isArray(original?.props) ? original.props : [];
 
@@ -517,7 +496,7 @@ export function createComponent(original, data, _props, parent = null, emitListe
         props = typeof data.props === "function" ? data.props() : data.props;
         delete data.props;
     }
-
+    
     // 2. Setup base component object
     const component = {
         $element: null,
