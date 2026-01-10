@@ -21,7 +21,7 @@ export class SignalObject {
     }
 
     _initValue(value) {
-        if (value && typeof value === "object" && value.constructor === Object) {
+        if (value && typeof value === "object") {
             // Create a dedicated proxy for this signal
             this._value = new Proxy(value, {
                 set: (target, prop, val) => {

@@ -43,8 +43,12 @@ const App = {
       {
         destination: '/user/2',
         title: 'User 2'
+      },
+      {
+        destination: '/nested-arrays',
+        title: 'Nested Arrays'
       }
-    ]
+      ]
     }
   },
   components: {

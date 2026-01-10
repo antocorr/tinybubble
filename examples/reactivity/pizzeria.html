@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pizzeria (Reactivity)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        tomato: {
+                            50: '#fff3f2',
+                            100: '#ffe4e2',
+                            200: '#ffcdc8',
+                            300: '#ffaba2',
+                            400: '#ff7a6b',
+                            500: '#f54535',
+                            600: '#df2b1c',
+                            700: '#b82015',
+                            800: '#981d16',
+                            900: '#7e1d18'
+                        },
+                        basil: {
+                            50: '#f2fbf6',
+                            100: '#dff7ea',
+                            200: '#b8ecd3',
+                            300: '#82dcb5',
+                            400: '#43c48f',
+                            500: '#23a772',
+                            600: '#18875b',
+                            700: '#146c4a',
+                            800: '#12563d',
+                            900: '#0f4733'
+                        },
+                        crust: {
+                            50: '#fff8ed',
+                            100: '#ffefd6',
+                            200: '#ffdbad',
+                            300: '#ffc27a',
+                            400: '#ffa845',
+                            500: '#f28b1f',
+                            600: '#d66c12',
+                            700: '#b15410',
+                            800: '#8e4213',
+                            900: '#733712'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .paper {
+            background-image:
+                radial-gradient(circle at 1px 1px, rgba(0, 0, 0, 0.045) 1px, transparent 0);
+            background-size: 20px 20px;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen bg-crust-50 text-stone-900 paper">
+    <div id="app" class="max-w-6xl mx-auto px-4 py-8"></div>
+    <script src="components/pizzeria.app.js" type="module" defer></script>
+</body>
+
+</html>

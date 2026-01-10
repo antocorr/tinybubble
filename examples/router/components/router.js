@@ -3,6 +3,7 @@ import { createRouter } from '../../../src/index.js';
 import Home from '../pages/Home.js';
 import About from '../pages/About.js';
 import User from '../pages/User.js';
+import NestedArrayPage from './NestedArrayPage.js';
 
 export const router = createRouter({
     mode: 'hash',
@@ -13,6 +14,7 @@ export const router = createRouter({
         { path: '/', component: Home },
         { path: '/about', component: About },
         { path: '/user/:id', component: User },
+        { path: '/nested-arrays', component: NestedArrayPage },
         { path: '/persistent-home', component: Home, persistent: true, data: { props: { addTitle: 'Is Persistent!' } } },
         { path: '/async', src: '../pages/AsyncPage.js' },
     ]

@@ -1,0 +1,68 @@
+{
+    "categories": [
+        {
+            "id": 1,
+            "name": "Classic"
+        },
+        {
+            "id": 2,
+            "name": "Specialty"
+        },
+        {
+            "id": 3,
+            "name": "Vegetarian"
+        }
+    ],
+    "ingredients": [
+        {
+            "id": 1,
+            "name": "Tomato Sauce"
+        },
+        {
+            "id": 2,
+            "name": "Mozzarella"
+        },
+        {
+            "id": 3,
+            "name": "Pepperoni"
+        },
+        {
+            "id": 4,
+            "name": "Chicken"
+        },
+        {
+            "id": 5,
+            "name": "Bell Peppers"
+        }
+    ],
+    "items": [
+        {
+            "id": 1,
+            "name": "Margherita",
+            "categoryId": 1,
+            "ingredientIds": [1, 2],
+            "price": 8.99
+        },
+        {
+            "id": 2,
+            "name": "Pepperoni Feast",
+            "categoryId": 2,
+            "ingredientIds": [1, 2, 3],
+            "price": 10.99
+        },
+        {
+            "id": 3,
+            "name": "Chicken Veggie",
+            "categoryId": 2,
+            "ingredientIds": [1, 2, 4, 5],
+            "price": 11.99
+        },
+        {
+            "id": 4,
+            "name": "Veggie Delight",
+            "categoryId": 3,
+            "ingredientIds": [1, 2, 5],
+            "price": 9.99
+        }
+    ]
+}

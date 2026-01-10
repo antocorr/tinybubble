@@ -30,15 +30,15 @@ export default {
     init() {
         this._data.uid.value = 'switch-' + Math.random().toString(36).slice(2, 8);
 
-        if (this.props['model-val'].value !== undefined) {
-            this._data.modelVal = this.props['model-val'];
+        if (this.props['model-val'] !== undefined) {
+            this._data.modelVal.value = this.props['model-val'];
         }
-        else if (this.props.default.value !== undefined) {
-            this._data.modelVal = this.props.default.value;
+        else if (this.props.default !== undefined) {
+            this._data.modelVal.value = this.props.default;
         }
 
-        if (this.props.class.value) {
-            this._data.extraClass.value = this.props.class.value;
+        if (this.props.class) {
+            this._data.extraClass.value = this.props.class;
         }
         this.update();
     },

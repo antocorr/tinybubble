@@ -11,7 +11,7 @@ const fnCache = new Map();
  * @param {boolean} unwrap 
  * @returns {any}
  */
-export function evaluate(expression, scope, context = null, returnResult = true) {
+export function evaluate(expression, scope, context = null, returnSignal = false) {
     try {
         // Optimization: Unique token extraction + Scope intersection
         // Regex matches identifiers: starts with letter/$/_, followed by letter/number/$/_
@@ -34,8 +34,7 @@ export function evaluate(expression, scope, context = null, returnResult = true)
         let fn = fnCache.get(cacheKey);
 
         if (!fn) {
-            const body = returnResult ? `return ${expression};` : `${expression};`;
-            console.log("body:", body, ...validKeys);
+            const body = `return ${expression};`;
             fn = new Function(...validKeys, body);
             fnCache.set(cacheKey, fn);
         }
@@ -45,12 +44,11 @@ export function evaluate(expression, scope, context = null, returnResult = true)
         // This allows signal.value usage in expressions, and implicit usage via valueOf
         // Extract values in the same order as keys
         const values = validKeys.map(k => {
-            return (scope[k] instanceof SignalObject) ? scope[k].value : scope[k];
+            return (scope[k] instanceof SignalObject && !returnSignal) ? scope[k].value : scope[k];
         });
         
         // Evaluate
         const result = fn.apply(context, values);
-        console.log("evaluate result:", result);
         return result;
     } catch (e) {
         // Suppress ReferenceError (treat as undefined)

@@ -71,11 +71,14 @@ const App = {
         console.log("new value", v)
     },
     addItem() {
+        console.log("adding item", this._data.newItem.value)
         if (!this._data.newItem.value) {
             return;
         }
-        this._data.items.push(this._data.newItem.value);
+        this._data.items.value.push(this._data.newItem.value);
         this._data.newItem.value = '';
+        console.log("items", this._data.items.value)
+        console.log("itemsSignal", this._data.items);
     },
     init() {
         watch(this._data.country1, (v, old) => {

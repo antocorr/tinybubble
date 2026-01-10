@@ -21,11 +21,11 @@ export default {
         this.emit('change', val, oldVal)
     },
     init() {
-        if (this.props.default.value) {
-            this._data.modelVal = this.props.default.value;
+        if (this.props.default) {
+            this._data.modelVal.value = this.props.default;
         }
-        if (this.props['model-val'].value) {
-            this._data.modelVal = this.props['model-val'];
+        if (this.props['model-val']) {
+            this._data.modelVal.value = this.props['model-val'];
             this.refs.select.value = this._data.modelVal.value;
         }
     },

@@ -1,4 +1,4 @@
-import { effect, Signal, SignalObject } from "./Signals.js";
+import { effect, Signal, SignalObject, watch } from "./Signals.js";
 import { evaluate } from "./Evaluate.js";
 
 /**
@@ -42,6 +42,68 @@ function prepareForReplace(txt) {
 }
 
 
+// ============================================================
+// SCOPE AND PROPS HELPERS
+// ============================================================
+
+/**
+ * Build the scope for template evaluation
+ * Uses _propsSignals for reactivity in templates
+ */
+function buildScope(component, localScope = {}) {
+    return {
+        ...component._methods,
+        ...component._data,
+        ...component._propsSignals,
+        ...localScope
+    };
+}
+function caseSensitiveToHyphen(str) {
+    return str.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
+}
+/**
+ * Create props object with Proxy for JS access and signals for template
+ */
+function createProps(propKeys, incoming) {
+    const _signals = {};
+    for (const k in incoming) {
+        const definedKey = propKeys.find(pk => pk === k || caseSensitiveToHyphen(pk) === k || pk.toLowerCase() === k.toLowerCase()) || k;
+        _signals[definedKey] = incoming[k] instanceof SignalObject ? incoming[k] : Signal(incoming[k]);
+    }
+    for (const k of propKeys) {
+        if (!(k in _signals)) {
+            _signals[k] = Signal(undefined);
+        }
+    }
+    const proxy = new Proxy(_signals, {
+        get(target, key) {
+            if (key === '_signals') return target;
+            const signal = target[key];
+            return signal ? signal.value : undefined;
+        },
+        set(target, key) {
+            console.warn(`Props are readonly at top-level. Cannot set "${key}".`);
+            return false;
+        }
+    });
+
+    return { proxy, signals: _signals };
+}
+
+/**
+ * Watch a specific prop for changes
+ */
+export function watchProp(component, key, callback) {
+    const signals = component._propsSignals;
+    if (!signals || !(key in signals)) {
+        console.warn(`watchProp: prop "${key}" not found in component.`);
+        return;
+    }
+    const signal = signals[key];
+    if (signal instanceof SignalObject) {
+        watch(signal, callback);
+    }
+}
 
 // ============================================================
 // DIRECTIVE HANDLERS
@@ -81,7 +143,7 @@ export function handleFor(el, component, localScope, bindNodeFn) {
         renderedItems = [];
 
         // Construct scope lazily
-        const currentScope = { ...component._methods, ...component._data, ...component.props, ...localScope };
+        const currentScope = buildScope(component, localScope);
 
         // Resolve list expression via evaluate for consistency with other bindings
         let list = listExpr ? evaluate(listExpr, currentScope, component) : [];
@@ -90,7 +152,7 @@ export function handleFor(el, component, localScope, bindNodeFn) {
         if (Array.isArray(list)) {
             list.forEach((itemData, idx) => {
                 // Clone the template
-                const clone = templateContent.cloneNode(true);               
+                const clone = templateContent.cloneNode(true);
                 // If it was a template tag, cloneNode returns a DocumentFragment
                 // We must iterate its children to apply binding
                 // If it was a regular element, clone is the element itself
@@ -99,7 +161,7 @@ export function handleFor(el, component, localScope, bindNodeFn) {
 
                 nodesToInsert.forEach(child => {
                     // Pass single item to scope
-                    const scoped = indexKey ? { ...localScope, [itemKey]: itemData, [indexKey]: idx } : { ...localScope, [itemKey]: itemData };                    
+                    const scoped = indexKey ? { ...localScope, [itemKey]: itemData, [indexKey]: idx } : { ...localScope, [itemKey]: itemData };
                     child._$localScope = scoped;
                     // Insert before binding so custom components have a parent (replaceWith needs it)
                     parent.insertBefore(child, anchor);
@@ -142,7 +204,7 @@ function handleIf(el, component, localScope, bindNodeFn) {
     let renderedNode = null;
 
     effect(() => {
-        const currentScope = { ...component._methods, ...component._data, ...component.props, ...localScope };
+        const currentScope = buildScope(component, localScope);
         const result = evaluate(expr, currentScope, component);
 
         if (result) {
@@ -189,7 +251,7 @@ function handleShowHide(el, component, localScope) {
         const isShow = el.hasAttribute('x-show');
         const expr = el.getAttribute(isShow ? 'x-show' : 'x-hide');
         effect(() => {
-            const currentScope = { ...component._methods, ...component._data, ...component.props, ...localScope };
+            const currentScope = buildScope(component, localScope);
             let res = evaluate(expr, currentScope, component);
             if (!isShow) res = !res;
             el.style.display = res ? '' : 'none';
@@ -219,7 +281,7 @@ function handleEvents(el, component, localScope) {
                     event.preventDefault();
                 }
                 // available in eval as $event
-                const currentScope = { ...component._methods, ...component._data, ...component.props, ...localScope };
+                const currentScope = buildScope(component, localScope);
                 const eventScope = { ...currentScope, $event: event };
                 if (typeof expr == "string" && !expr.includes(' ') && !expr.includes('(')) {
                     if (typeof component[expr] == "function") {
@@ -240,33 +302,40 @@ function handleEvents(el, component, localScope) {
         }
     });
 }
-
 function handleModel(el, component, localScope) {
-    if (el.hasAttribute('x-model')) {
-        const key = el.getAttribute('x-model');
-        // We need scope to find the signal
-        const currentScope = { ...component._methods, ...component._data, ...component.props, ...localScope };
-        if (currentScope[key] && currentScope[key] instanceof SignalObject) {
-            const signal = currentScope[key];
-            // Init
-            el.value = signal.value;
-            // DOM Listener
-            el.addEventListener('input', () => {
-                signal.value = el.value
-            });
-            // Signal Listener
-            effect(() => {
-                if (el.value !== signal.value) el.value = signal.value;
-            });
-        }
-    }
-}
+    if (!el.hasAttribute('x-model')) return;
+    const expr = el.getAttribute('x-model');
 
+    const scope = buildScope(component, localScope);
+    const returnSignal = !expr.includes('.');
+    const parts = expr.split('.');
+    const last = parts.pop();
+    const targetExpr = parts.join('.') || expr;
+    el.addEventListener('input', () => {
+        const target = targetExpr ? evaluate(targetExpr, scope, component, returnSignal) : scope;
+        if (target instanceof SignalObject) {
+            target.value = el.value;
+        } else {
+            if (target && last != null) target[last] = el.value;
+        }
+    });
+
+    effect(() => {
+        const target = evaluate(targetExpr, scope, component, returnSignal);
+        let next = '';
+        if (target instanceof SignalObject) {
+            next = target.value;
+        } else {
+            next = target ? target[last] : '';
+        }
+        if (el.value !== next) el.value = next;
+    });
+}
 function handleCustomComponent(el, component, localScope) {
     // Handle Nested Components (custom tags defined in component.components)
     const tagName = el.tagName.toLowerCase();
     if (component.components && component.components[tagName]) {
-        const currentScope = { ...component._methods, ...component._data, ...component.props, ...localScope };
+        const currentScope = buildScope(component, localScope);
         const compDef = component.components[tagName];
         const childProps = { children: el.innerHTML };
         const emitListeners = {};
@@ -326,7 +395,7 @@ function handleCustomComponent(el, component, localScope) {
         const childComp = createComponent(compDef, undefined, childProps, component, emitListeners);
         nativeEventBindings.forEach(({ eventName, expr }) => {
             childComp.$element.addEventListener(eventName, (event) => {
-                const scope = { ...component._methods, ...component._data, ...component.props, ...localScope };
+                const scope = buildScope(component, localScope);
                 const eventScope = { ...scope, $event: event };
                 if (typeof expr == "string" && !expr.includes(' ') && !expr.includes('(')) {
                     if (typeof component[expr] == "function") {
@@ -365,7 +434,7 @@ function handleTextNode(el, component, localScope) {
         const [textArr, reactiveIndexes] = prepareForReplace(el.textContent);
 
         effect(() => {
-            const currentScope = { ...component._methods, ...component._data, ...component.props, ...localScope };
+            const currentScope = buildScope(component, localScope);
             let newText = '';
             for (let i = 0; i < textArr.length; i++) {
                 if (reactiveIndexes.includes(i)) {
@@ -392,7 +461,7 @@ function handleAttributes(el, component, localScope) {
             const attrName = attr.name.substring(1);
             const expr = attr.value;
             effect(() => {
-                const currentScope = { ...component._methods, ...component._data, ...component.props, ...localScope };
+                const currentScope = buildScope(component, localScope);
                 const val = evaluate(expr, currentScope, component);
                 if (val !== undefined && val !== null) {
                     if (['disabled'].includes(attrName)) {
@@ -465,11 +534,7 @@ function bindNode(el, component, localScope) {
         handleTextNode(el, component, localScope);
     }
 }
-function createProps(propKeys, incoming) {
-    //proxy, incoming is the data passed to the component, most of the time it's undefined/empty
-    //if an updated prop is a signalobject it must be unwrapped, we should alway work with the original data
 
-}
 
 /**
  * Creates the component
@@ -496,7 +561,7 @@ export function createComponent(original, data, _props, parent = null, emitListe
         props = typeof data.props === "function" ? data.props() : data.props;
         delete data.props;
     }
-    
+
     // 2. Setup base component object
     const component = {
         $element: null,
@@ -525,13 +590,11 @@ export function createComponent(original, data, _props, parent = null, emitListe
         }
     };
 
-    // 3. Initialize Props as Signals (include declared props even if not passed)
+    // 3. Initialize Props with Proxy (readonly top-level, unwrap for JS access)
     const incomingProps = _props || {};
-    const propKeys = new Set([...declaredProps, ...Object.keys(incomingProps)]);
-    for (const k of propKeys) {
-        const incoming = incomingProps[k];
-        component.props[k] = incoming instanceof SignalObject ? incoming : Signal(incoming);
-    }
+    const { proxy, signals } = createProps(declaredProps, incomingProps);
+    component.props = proxy;              // Proxy for JS access (auto-unwrap)
+    component._propsSignals = signals;    // Original signals for template reactivity
 
     // 4. Initialize Data as Signals
     if (component.data) {
@@ -540,7 +603,7 @@ export function createComponent(original, data, _props, parent = null, emitListe
         const merged = { ...initData, ...props };
 
         for (const key in merged) {
-            component._data[key] = Signal(merged[key]);            
+            component._data[key] = Signal(merged[key]);
         }
     }
 
