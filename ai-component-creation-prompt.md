@@ -6,7 +6,7 @@ You are building Bubble Single File Components (SFC-style) that run in the brows
 - Components are plain objects consumed by `createComponent` from `src/index.js`.
 - `template()` returns a string of HTML; it can include Bubble directives and `{{ }}` interpolations.
 - `data()` returns initial reactive state; Bubble wraps each key in a `SignalObject`, accessible as `this._data.key.value`.
-- `props` declared on a component become reactive signals on `component.props`.
+- `props` declared on a component become unwrapped values on `component.props`.
 - Methods are regular functions on the object; access them with `this` inside the component or call them from templates via directives.
 - Lifecycle-like hooks: `init()` runs after binding; `mounted()` (if present) is invoked when appended manually in some examples.
 
@@ -22,7 +22,7 @@ You are building Bubble Single File Components (SFC-style) that run in the brows
 
 ## Custom components, props, and emits
 - Register child components via a `components` map: `{ 'my-child': ChildComponent }`.
-- Pass data down with static attributes or `:prop="expression"`. If the expression is a `SignalObject`, it is forwarded as a live signal.
+- Pass data down with static attributes or `:prop="expression"`. If the expression is a `SignalObject`, it is forwarded as a value.
 - Declare `emits: ['eventName']` on the child; parents listen with `-x-on:eventName="handler"`. Inside the child, call `this.emit('eventName', payload)`.
 - Slots/children are available as `props.children` on functional components (those exported as a function instead of an object).
 
@@ -67,7 +67,7 @@ export default {
   },
   saveProfile() {
     this._data.savedMsg.value = 'Saved!';
-    this.emit('saved', { id: this.props.userId.value, name: this._data.name.value });
+    this.emit('saved', { id: this.props.userId, name: this._data.name.value });
   }
 };
 ```
