@@ -14,7 +14,7 @@ export function html(markup) {
 
 const styleTagsAdded = new Set();
 
-export const mixins = {};
+export const globals = {};
 
 const BOOLEAN_ATTRS = new Set([
     'disabled', 'checked', 'selected', 'readonly', 'required',
@@ -58,7 +58,7 @@ function prepareForReplace(txt) {
  */
 function buildScope(component, localScope = {}) {
     return {
-        ...mixins,
+        ...globals,
         ...component._methods,
         ...component.data,
         ...component._propsSignals,

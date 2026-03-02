@@ -108,15 +108,15 @@ bubble.topic("layout").on('resize', (size) => {
 
 ```
 
-### Global template helpers via mixins
+### Global template helpers via globals
 
 Register any function once and use it in every component template without importing it per-component.
 
 ```javascript
-import { mixins } from "bubble";
+import { globals } from "bubble";
 import { t } from "./i18n.js";
 
-mixins.t = t;
+globals.t = t;
 ```
 
 ```html

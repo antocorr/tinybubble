@@ -214,15 +214,15 @@ Rules:
 
 ---
 
-## 7. Mixins (global template helpers)
+## 7. Globals (global template helpers)
 
 Register functions once, available in every component's template scope without per-component imports:
 
 ```js
-import { mixins } from "./src/lib/Reactivity.js";
+import { globals } from "./src/lib/Reactivity.js";
 
-mixins.btr = btranslate;
-mixins.fmt = formatDate;
+globals.btr = btranslate;
+globals.fmt = formatDate;
 ```
 
 ```html
@@ -301,7 +301,7 @@ Before finalizing Bubble-related edits:
 | Child prop does not update / wrong value shape | `references/props-emits.md` |
 | Event handlers fire multiple times after re-init | `references/pubsub-lifecycle.md` |
 | New page/component scaffold needed | `references/components-core.md` |
-| Template helper not available in interpolation | Section 7 (Mixins) |
+| Template helper not available in interpolation | Section 7 (Globals) |
 
 ---
 
