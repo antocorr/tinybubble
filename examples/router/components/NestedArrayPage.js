@@ -136,7 +136,7 @@ export default {
         };
     },
     getTotalLists() {
-        const boards = this._data.boards.value || [];
+        const boards = this.data.boards.value || [];
         return boards.reduce((sum, board) => sum + (board.lists?.length || 0), 0);
     },
     getBoardCardCount(board) {
@@ -144,7 +144,7 @@ export default {
         return lists.reduce((sum, list) => sum + (list.cards?.length || 0), 0);
     },
     getTotalCards() {
-        const boards = this._data.boards.value || [];
+        const boards = this.data.boards.value || [];
         return boards.reduce((sum, board) => sum + this.getBoardCardCount(board), 0);
     }
 };

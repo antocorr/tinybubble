@@ -31,8 +31,8 @@ export default {
     };
   },
   incrementVisits() {
-    // In Bubble SFC components, reactive data lives under this._data
-    this._data.visits.value++;
+    // In Bubble SFC components, reactive data lives under this.data
+    this.data.visits.value++;
   },
   init() {
     // Optional lifecycle hook after DOM mount

@@ -168,37 +168,37 @@ const PizzeriaApp = {
         this.loadData();
     },
     async loadData() {
-        this._data.loading.value = true;
-        this._data.error.value = "";
-        this._data.toast.value = "";
+        this.data.loading.value = true;
+        this.data.error.value = "";
+        this.data.toast.value = "";
         try {
             const url = new URL("../data/pizzeria.json", import.meta.url);
             const res = await fetch(url);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const json = await res.json();
 
-            this._data.categories.value = json.categories || [];
-            this._data.ingredients.value = json.ingredients || [];
-            this._data.items.value = json.items || [];
+            this.data.categories.value = json.categories || [];
+            this.data.ingredients.value = json.ingredients || [];
+            this.data.items.value = json.items || [];
 
-            const firstId = this._data.items.value?.[0]?.id ?? null;
+            const firstId = this.data.items.value?.[0]?.id ?? null;
             if (firstId != null) this.selectPizza(firstId);
         } catch (err) {
             console.warn("Menu loading error:", err);
-            this._data.error.value = "Unable to load the menu.";
-            this._data.items.value = [];
-            this._data.selectedPizzaId.value = null;
-            this._data.selectedPizza.value = null;
+            this.data.error.value = "Unable to load the menu.";
+            this.data.items.value = [];
+            this.data.selectedPizzaId.value = null;
+            this.data.selectedPizza.value = null;
         } finally {
-            this._data.loading.value = false;
+            this.data.loading.value = false;
         }
     },
     resetFilters() {
-        this._data.search.value = "";
-        this._data.selectedCategoryId.value = 0;
+        this.data.search.value = "";
+        this.data.selectedCategoryId.value = 0;
     },
     setCategory(categoryId) {
-        this._data.selectedCategoryId.value = categoryId;
+        this.data.selectedCategoryId.value = categoryId;
     },
     formatPrice(v) {
         const n = Number(v);
@@ -207,13 +207,13 @@ const PizzeriaApp = {
     },
     getCategoryName(categoryId) {
         const id = Number(categoryId);
-        const cat = (this._data.categories.value || []).find((c) => c.id === id);
+        const cat = (this.data.categories.value || []).find((c) => c.id === id);
         return cat?.name || "—";
     },
     getVisibleItems() {
-        const items = this._data.items.value || [];
-        const q = String(this._data.search.value || "").trim().toLowerCase();
-        const catId = Number(this._data.selectedCategoryId.value) || 0;
+        const items = this.data.items.value || [];
+        const q = String(this.data.search.value || "").trim().toLowerCase();
+        const catId = Number(this.data.selectedCategoryId.value) || 0;
 
         return items.filter((p) => {
             if (catId && Number(p.categoryId) !== catId) return false;
@@ -222,30 +222,30 @@ const PizzeriaApp = {
         });
     },
     selectPizza(pizzaId) {
-        const items = this._data.items.value || [];
+        const items = this.data.items.value || [];
         const id = Number(pizzaId);
         const pizza = items.find((p) => Number(p.id) === id);
         if (!pizza) {
-            this._data.selectedPizzaId.value = null;
-            this._data.selectedPizza.value = null;
+            this.data.selectedPizzaId.value = null;
+            this.data.selectedPizza.value = null;
             return;
         }
 
-        this._data.selectedPizzaId.value = pizza.id;
-        this._data.editorMode.value = "edit";
-        this._data.selectedPizza.value = {
+        this.data.selectedPizzaId.value = pizza.id;
+        this.data.editorMode.value = "edit";
+        this.data.selectedPizza.value = {
             ...pizza,
             ingredientIds: [...(pizza.ingredientIds || [])]
         };
     },
     startNewPizza() {
-        const categories = this._data.categories.value || [];
+        const categories = this.data.categories.value || [];
         const categoryId = categories?.[0]?.id ?? "";
 
-        this._data.selectedPizzaId.value = null;
-        this._data.editorMode.value = "new";
-        this._data.toast.value = "";
-        this._data.selectedPizza.value = {
+        this.data.selectedPizzaId.value = null;
+        this.data.editorMode.value = "new";
+        this.data.toast.value = "";
+        this.data.selectedPizza.value = {
             name: "",
             categoryId,
             ingredientIds: [],
@@ -253,18 +253,18 @@ const PizzeriaApp = {
         };
     },
     onCancelEdit() {
-        if (this._data.editorMode.value === "new") {
-            this._data.selectedPizza.value = null;
-            this._data.editorMode.value = "edit";
+        if (this.data.editorMode.value === "new") {
+            this.data.selectedPizza.value = null;
+            this.data.editorMode.value = "edit";
             return;
         }
-        const id = this._data.selectedPizzaId.value;
+        const id = this.data.selectedPizzaId.value;
         if (id != null) this.selectPizza(id);
     },
     onSavePizza(payload) {
-        const item = payload?.item || this._data.selectedPizza.value;
+        const item = payload?.item || this.data.selectedPizza.value;
         if (!item) {
-            this._data.toast.value = "Unable to save: missing data.";
+            this.data.toast.value = "Unable to save: missing data.";
             return;
         }
 
@@ -276,35 +276,35 @@ const PizzeriaApp = {
             ingredientIds: [...ingredients]
         };
 
-        const items = this._data.items.value || [];
-        const isNew = this._data.editorMode.value === "new" || normalized.id == null;
+        const items = this.data.items.value || [];
+        const isNew = this.data.editorMode.value === "new" || normalized.id == null;
 
         if (isNew) {
             const maxId = items.reduce((m, p) => Math.max(m, Number(p.id) || 0), 0);
             const saved = { ...normalized, id: maxId + 1 };
-            this._data.items.value = [...items, saved];
-            this._data.toast.value = "Pizza added to the menu.";
-            this._data.editorMode.value = "edit";
+            this.data.items.value = [...items, saved];
+            this.data.toast.value = "Pizza added to the menu.";
+            this.data.editorMode.value = "edit";
             this.selectPizza(saved.id);
             return;
         }
 
         const updated = items.map((p) => Number(p.id) === Number(normalized.id) ? { ...p, ...normalized } : p);
-        this._data.items.value = updated;
-        this._data.toast.value = "Changes saved.";
+        this.data.items.value = updated;
+        this.data.toast.value = "Changes saved.";
         this.selectPizza(normalized.id);
     },
     onDeletePizza({ id }) {
-        const items = this._data.items.value || [];
+        const items = this.data.items.value || [];
         const next = items.filter((p) => Number(p.id) !== Number(id));
         if (next.length === items.length) return;
 
         const removed = items.find((p) => Number(p.id) === Number(id));
-        this._data.items.value = next;
-        this._data.toast.value = `Deleted: ${removed?.name || "pizza"}.`;
-        this._data.selectedPizzaId.value = null;
-        this._data.selectedPizza.value = null;
-        this._data.editorMode.value = "edit";
+        this.data.items.value = next;
+        this.data.toast.value = `Deleted: ${removed?.name || "pizza"}.`;
+        this.data.selectedPizzaId.value = null;
+        this.data.selectedPizza.value = null;
+        this.data.editorMode.value = "edit";
 
         if (next.length) {
             this.selectPizza(next[0].id);

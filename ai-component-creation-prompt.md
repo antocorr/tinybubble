@@ -5,7 +5,7 @@ You are building Bubble Single File Components (SFC-style) that run in the brows
 ## Core concepts
 - Components are plain objects consumed by `createComponent` from `src/index.js`.
 - `template()` returns a string of HTML; it can include Bubble directives and `{{ }}` interpolations.
-- `data()` returns initial reactive state; Bubble wraps each key in a `SignalObject`, accessible as `this._data.key.value`.
+- `data()` returns initial reactive state; Bubble wraps each key in a `SignalObject`, accessible as `this.data.key.value`.
 - `props` declared on a component become unwrapped values on `component.props`.
 - Methods are regular functions on the object; access them with `this` inside the component or call them from templates via directives.
 - Lifecycle-like hooks: `init()` runs after binding; `mounted()` (if present) is invoked when appended manually in some examples.
@@ -66,8 +66,8 @@ export default {
     };
   },
   saveProfile() {
-    this._data.savedMsg.value = 'Saved!';
-    this.emit('saved', { id: this.props.userId, name: this._data.name.value });
+    this.data.savedMsg.value = 'Saved!';
+    this.emit('saved', { id: this.props.userId, name: this.data.name.value });
   }
 };
 ```
@@ -120,7 +120,7 @@ app.appendTo(document.getElementById('app'));
 
 ## Authoring checklist
 - Always return a single root element from `template()`.
-- Mutate state via `this._data.key.value = ...` (or `.push()` on arrays) so effects run.
+- Mutate state via `this.data.key.value = ...` (or `.push()` on arrays) so effects run.
 - Keep `props` and `data` values serializable; styling can be inline or via `style` string on the component.
 - Prefer `@event="methodName"` for clarity; use expressions only when needed.
 - For lists, wrap markup in `<template x-for="item in items">` when you need multiple root nodes.

@@ -56,10 +56,10 @@ const App = {
     'router-view': router.RouterView
   },
   selectLink(item) {
-    this._data.currentLink.value = item.destination;
+    this.data.currentLink.value = item.destination;
   },
   init() {
-    this._data.currentLink.value = router.getDestination();
+    this.data.currentLink.value = router.getDestination();
   }
 };
 

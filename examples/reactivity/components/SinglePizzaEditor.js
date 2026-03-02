@@ -153,7 +153,7 @@ export default {
         if (!Number.isFinite(categoryId) || categoryId <= 0) errors.push("Select a category.");
         if (ingredientIds.length === 0) errors.push("Select at least one ingredient.");
 
-        this._data.errors.value = errors;
+        this.data.errors.value = errors;
         return errors.length === 0;
     },
     save(evt) {
@@ -166,12 +166,12 @@ export default {
             ingredientIds: Array.isArray(item.ingredientIds) ? [...item.ingredientIds] : []
         };
 
-        this._data.errors.value = [];
+        this.data.errors.value = [];
         this.emit("save", { item: payload });
     },
     cancel() {
         // Clear errors and emit cancel
-        this._data.errors.value = [];
+        this.data.errors.value = [];
         this.emit("cancel");
     },
     requestDelete() {

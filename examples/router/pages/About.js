@@ -12,9 +12,9 @@ export default {
 
         <h2 class="text-2xl font-semibold mb-2">Key Features</h2>
         <ul class="list-disc list-inside mb-4">
-          {{#each item in features}}
+          <template x-for="item in features">
             <li>{{item}}</li>
-          {{/each}}
+          </template>
         </ul>
 
         <div class="mb-6">

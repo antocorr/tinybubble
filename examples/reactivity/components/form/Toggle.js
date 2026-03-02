@@ -20,25 +20,25 @@ export default {
         }
     },
     update() {
-        this._data.isOn.value = !!this._data.modelVal.value;
+        this.data.isOn.value = !!this.data.modelVal.value;
     },
     change() {
-        this._data.modelVal.value = !this._data.modelVal.value;
+        this.data.modelVal.value = !this.data.modelVal.value;
         this.update();
-        this.emit('change', this._data.modelVal.value, !this._data.modelVal.value)
+        this.emit('change', this.data.modelVal.value, !this.data.modelVal.value)
     },
     init() {
-        this._data.uid.value = 'switch-' + Math.random().toString(36).slice(2, 8);
+        this.data.uid.value = 'switch-' + Math.random().toString(36).slice(2, 8);
 
         if (this.props['model-val'] !== undefined) {
-            this._data.modelVal.value = this.props['model-val'];
+            this.data.modelVal.value = this.props['model-val'];
         }
         else if (this.props.default !== undefined) {
-            this._data.modelVal.value = this.props.default;
+            this.data.modelVal.value = this.props.default;
         }
 
         if (this.props.class) {
-            this._data.extraClass.value = this.props.class;
+            this.data.extraClass.value = this.props.class;
         }
         this.update();
     },

@@ -62,26 +62,26 @@ const App = {
         }
     },
     selectChange(v) {
-        console.log("select changed", v, this._data.country1.value)
+        console.log("select changed", v, this.data.country1.value)
     },
     increment() {
-        this._data.counter.value++;
+        this.data.counter.value++;
     },
     switchChange(v) {
         console.log("new value", v)
     },
     addItem() {
-        console.log("adding item", this._data.newItem.value)
-        if (!this._data.newItem.value) {
+        console.log("adding item", this.data.newItem.value)
+        if (!this.data.newItem.value) {
             return;
         }
-        this._data.items.value.push(this._data.newItem.value);
-        this._data.newItem.value = '';
-        console.log("items", this._data.items.value)
-        console.log("itemsSignal", this._data.items);
+        this.data.items.value.push(this.data.newItem.value);
+        this.data.newItem.value = '';
+        console.log("items", this.data.items.value)
+        console.log("itemsSignal", this.data.items);
     },
     init() {
-        watch(this._data.country1, (v, old) => {
+        watch(this.data.country1, (v, old) => {
             console.log("watcher is enabled", v, old)
         })
     }

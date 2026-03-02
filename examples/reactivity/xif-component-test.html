@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>x-if + component test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="p-8 space-y-8">
+    <div id="app"></div>
+    <script type="module">
+        import { createComponent } from "../../../src/index.js";
+
+        const Card = {
+            name: 'Card',
+            props: ['title', 'count'],
+            template() {
+                return `<div class="border p-4 rounded bg-blue-50">
+                    <h2 id="title-output" class="font-bold text-blue-800">{{ title }}</h2>
+                    <p id="count-output">Count from prop: {{ count }}</p>
+                </div>`;
+            }
+        };
+
+        const App = {
+            name: 'App',
+            components: { 'card': Card },
+            template() {
+                return `<div class="space-y-4">
+                    <h1 class="text-xl font-bold">x-if + component reactive props test</h1>
+                    <div class="flex gap-2">
+                        <button id="btn-toggle" class="px-3 py-1 bg-blue-500 text-white rounded" @click="this.toggle()">Toggle ({{ show }})</button>
+                        <button id="btn-inc" class="px-3 py-1 bg-green-500 text-white rounded" @click="this.inc()">Inc ({{ counter }})</button>
+                    </div>
+                    <div x-if="show" class="border p-3">
+                        <p class="text-xs text-gray-500">Complex expression prop + bare signal prop</p>
+                        <card :title="'Counter: ' + counter" :count="counter" />
+                    </div>
+                </div>`;
+            },
+            data() { return { show: true, counter: 0 }; },
+            toggle() { this.data.show.value = !this.data.show.value; },
+            inc() { this.data.counter.value++; }
+        };
+
+        createComponent(App).appendTo(document.getElementById('app'));
+    </script>
+</body>
+</html>

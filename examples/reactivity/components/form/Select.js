@@ -22,11 +22,11 @@ export default {
     },
     init() {
         if (this.props.default) {
-            this._data.modelVal.value = this.props.default;
+            this.data.modelVal.value = this.props.default;
         }
         if (this.props['model-val']) {
-            this._data.modelVal.value = this.props['model-val'];
-            this.refs.select.value = this._data.modelVal.value;
+            this.data.modelVal.value = this.props['model-val'];
+            this.refs.select.value = this.data.modelVal.value;
         }
     },
     emits: ['change']

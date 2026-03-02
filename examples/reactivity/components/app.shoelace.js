@@ -27,7 +27,7 @@ const App = {
     },
     init() {
         this.refs.rating.addEventListener('sl-change', (ev) => {
-            this._data.score.value = ev.target.value;
+            this.data.score.value = ev.target.value;
         })  
     },
     style() {

@@ -20,6 +20,6 @@ export default {
     },
     init() {
         // Dimostra l'accesso tramite this.$route nel codice
-        this._data.scriptId.value = this.$route.params.id;
+        this.data.scriptId.value = this.$route.params.id;
     }
 }

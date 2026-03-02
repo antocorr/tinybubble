@@ -105,16 +105,16 @@ comp.appendTo(host);
         };
     },
     simulateFetch() {
-        if (this._data.loading.value) return;
+        if (this.data.loading.value) return;
         this.refs.fetchBtn.setAttribute('disabled', true);
-        this._data.loading.value = true;
-        this._data.status.value = 'Request in flight…';
+        this.data.loading.value = true;
+        this.data.status.value = 'Request in flight…';
         const startedAt = new Date().toLocaleTimeString();
         setTimeout(() => {
             const finishedAt = new Date().toLocaleTimeString();
-            this._data.loading.value = false;
-            this._data.status.value = 'Finished — data cached locally.';
-            this._data.log.value = [
+            this.data.loading.value = false;
+            this.data.status.value = 'Finished — data cached locally.';
+            this.data.log.value = [
                 `Started at ${startedAt}`,
                 `Completed at ${finishedAt}`,
                 'Response cached in memory for this session.'
@@ -123,21 +123,21 @@ comp.appendTo(host);
         }, 650);
     },
     async loadAsyncChild() {
-        if (this._data.childLoading.value) return;
-        this._data.childLoading.value = true;
-        this._data.childStatus.value = 'Importing module via importComponent...';
+        if (this.data.childLoading.value) return;
+        this.data.childLoading.value = true;
+        this.data.childStatus.value = 'Importing module via importComponent...';
         const host = this.refs.asyncChildHost;
         host.innerHTML = '';
         try {
             const src = new URL('../components/AsyncComponent.js', import.meta.url).href;
             const comp = await importComponent(src);
             comp.appendTo(host);
-            this._data.childLoaded.value = true;
-            this._data.childStatus.value = 'Component mounted from async import.';
+            this.data.childLoaded.value = true;
+            this.data.childStatus.value = 'Component mounted from async import.';
         } catch (err) {
-            this._data.childStatus.value = 'Failed to import component. Check the console for details.';
+            this.data.childStatus.value = 'Failed to import component. Check the console for details.';
         } finally {
-            this._data.childLoading.value = false;
+            this.data.childLoading.value = false;
         }
     },    
 };

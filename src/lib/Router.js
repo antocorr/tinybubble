@@ -79,24 +79,41 @@ export function createRouter({ mode = 'history', base = '/', routes = [], srcBas
         return RouterLink({ to, children, ...attrs });
     }
     // Helper: converte path "/user/:id" in regex e estrae parametri
+    // Supporta anche parametri opzionali ":id?"
     function matchRoute(routePath, currentPath) {
+        if (routePath === '*') {
+            return { params: {} };
+        }
+
         // Se non ci sono parametri dinamici, match esatto
         if (!routePath.includes(':')) {
             return routePath === currentPath ? { params: {} } : null;
         }
-        
+
         const paramNames = [];
-        const regexPath = routePath.replace(/:([^/]+)/g, (_, key) => {
-            paramNames.push(key);
-            return '([^/]+)';
+        const routeSegments = routePath.split('/').filter(Boolean);
+        const regexParts = routeSegments.map((segment) => {
+            if (!segment.startsWith(':')) {
+                return `/${segment}`;
+            }
+
+            const isOptional = segment.endsWith('?');
+            const key = segment.slice(1, isOptional ? -1 : undefined);
+            paramNames.push({ key, optional: isOptional });
+
+            return isOptional ? '(?:/([^/]+))?' : '/([^/]+)';
         });
+
+        const regexPath = regexParts.length ? regexParts.join('') : '/';
 
         const match = currentPath.match(new RegExp(`^${regexPath}$`));
         if (!match) return null;
 
         const params = {};
         match.slice(1).forEach((val, i) => {
-            params[paramNames[i]] = val;
+            const descriptor = paramNames[i];
+            if (!descriptor) return;
+            params[descriptor.key] = val;
         });
         return { params };
     }

@@ -1,5 +1,5 @@
 # BubbleJs
-A micro (less than **4kb** gzipped ) reactive vanilla javascript UI component **standalone** library based on Signals and pub sub.
+A micro (less than **5kb** gzipped ) reactive vanilla javascript UI component **standalone** library based on Signals and pub sub.
 
 ## Import the library
 ### As a ES-6 module (recommended) from CDN
@@ -36,8 +36,8 @@ export default {
          `
     },
     increment() {
-        //data is the original data, _data are signals
-        this._data.counter.value++;
+        //data is the original data, data are signals
+        this.data.counter.value++;
     },
     data(){
         return{
@@ -107,6 +107,25 @@ bubble.topic("layout").on('resize', (size) => {
 })
 
 ```
+
+### Global template helpers via mixins
+
+Register any function once and use it in every component template without importing it per-component.
+
+```javascript
+import { mixins } from "bubble";
+import { t } from "./i18n.js";
+
+mixins.t = t;
+```
+
+```html
+<!-- inside any component template -->
+<p>{{ t('welcome_message') }}</p>
+<button :title="t('save')">Save</button>
+```
+
+Component methods, data, and props always take precedence over mixin keys, so there are no accidental overrides.
 
 ### Easy routing included
 
@@ -198,6 +217,11 @@ Being small and relatively simple (the minified version is just 3k tokens) and b
 There is also a prompt ready to use here
 
 https://github.com/antocorr/bubble/blob/main/ai-component-creation-prompt.md
+
+And the agents/claude skill ready to use.
+
+https://github.com/antocorr/bubble/blob/main/.claude/skills/bubble-components-pubsub
+
 
 And this a test I made using GPT 5.1
 
