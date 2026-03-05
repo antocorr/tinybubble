@@ -1,4 +1,0 @@
-interface:
-  display_name: "Bubble Components + PubSub"
-  short_description: "GitHub-first conventions from antocorr/bubble for SFC components, props/emits, and event topic wiring."
-  default_prompt: "Use antocorr/bubble as primary source. Always apply this skill for .bub.js and .bubble.js files. Enforce raw props in JS and bubble.events.topic pub-sub patterns."

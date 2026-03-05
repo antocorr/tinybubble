@@ -1,0 +1,22 @@
+{
+    "name": "bubble-translate",
+    "version": "0.1.0",
+    "type": "module",
+    "description": "Lightweight translation plugin for Bubble, Vue, and vanilla JS",
+    "main": "index.js",
+    "exports": {
+        ".": "./index.js",
+        "./bubble": "./bubble.js",
+        "./vue": "./vue.js"
+    },
+    "peerDependencies": {
+        "bubblejs": ">=1.0.0",
+        "vue": ">=3.0.0"
+    },
+    "peerDependenciesMeta": {
+        "bubblejs": { "optional": true },
+        "vue": { "optional": true }
+    },
+    "keywords": ["bubble", "translate", "vue", "localization"],
+    "license": "MIT"
+}

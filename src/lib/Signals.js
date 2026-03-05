@@ -48,6 +48,15 @@ export function collectEffects(fn) {
 }
 
 /**
+ * Register a dispose function into the current effect scope.
+ * Allows child components to be cleaned up when the parent scope is disposed.
+ * @param {Function} fn
+ */
+export function registerDispose(fn) {
+    if (_effectScope) _effectScope.push(fn);
+}
+
+/**
  * Reactive effect with auto-tracking. Returns a dispose function.
  * @param {Function} fn
  * @returns {Function} dispose

@@ -1,16 +1,16 @@
-# BubbleJs
+# BubbleJs another micro javascript UI library
 A micro (less than **5kb** gzipped ) reactive vanilla javascript UI component **standalone** library based on Signals and pub sub.
 
 ## Import the library
 ### As a ES-6 module (recommended) from CDN
 ```javascript
-import { createComponent } from "https://cdn.jsdelivr.net/gh/antocorr/bubble/dist/bubble.js"
+import { createComponent } from "https://cdn.jsdelivr.net/npm/bubblejs/dist/bubble.js"
 ```
 
 ### Import via npm
 
 ```shell
-npm i https://github.com/antocorr/bubble
+npm i bubblejs
 ```
 
 
@@ -52,7 +52,7 @@ export default {
 
 ```javascript
 //in your main js file
-import { createComponent } from "bubble";
+import { createComponent } from "bubblejs";
 import MyComponent from "./components/MyComponent.js";
 const override = { name 'Hadouken', props: { counter: 5, character: 'Ryu'} };
 const myComponent = createComponent(MyComponent,  override);
@@ -94,13 +94,13 @@ Use the built-in event bus when you need two components to talk without a direct
 
 ```javascript
 //in any component, parent, children, sibling
-import { bubble } from "../yourpath-to-bubble/bubble-events.js";
+import { bubble } from "bubblejs/dist/bubble-events.js";
 
-bubble.topic('layout').emit('resize', 'small');
+bubble.events.topic('layout').emit('resize', 'small');
 
 //in any other component for example Sidebar.js
 
-bubble.topic("layout").on('resize', (size) => {
+bubble.events.topic("layout").on('resize', (size) => {
     if(size == 'small'){
         hideSecondaryLinks();
     }
@@ -113,7 +113,7 @@ bubble.topic("layout").on('resize', (size) => {
 Register any function once and use it in every component template without importing it per-component.
 
 ```javascript
-import { globals } from "bubble";
+import { globals } from "bubblejs";
 import { t } from "./i18n.js";
 
 globals.t = t;
@@ -133,7 +133,7 @@ Bubble ships with a tiny router so you can wire navigation without extra deps. D
 
 ```javascript
 // router.js
-import { createRouter } from "bubble";
+import { createRouter } from "bubblejs";
 import Home from "./pages/Home.js";
 import About from "./pages/About.js";
 
@@ -150,7 +150,7 @@ export const router = createRouter({
 
 ```javascript
 // App.js
-import { createComponent } from "bubble";
+import { createComponent } from "bubblejs";
 import { router } from "./router.js";
 
 export default {
@@ -191,7 +191,7 @@ export const router = createRouter({
 
 ```javascript
 // Lazy widget anywhere else
-import { importComponent } from "bubble";
+import { importComponent } from "bubblejs";
 
 async function mountWidget(host) {
   const src = new URL("./components/ChartWidget.js", import.meta.url).href;
@@ -212,7 +212,9 @@ router: https://antocorr.github.io/bubble/examples/router/index.html
 
 ## AI FRIENDLY
 
-Being small and relatively simple (the minified version is just 3k tokens) and by pairing it with tailwind you can create all sort of components usin any LLM.
+Being small and relatively simple (the minified version is just 4k tokens) and by pairing it with tailwind you can create all sort of components usin any LLM.
+
+Bubble is especially AI-friendly because the whole core mental model (templating directives, signals-based reactivity, and router) is clear and small, so an LLM can keep almost the entire framework behavior in context while generating or refactoring components.
 
 There is also a prompt ready to use here
 
@@ -220,9 +222,9 @@ https://github.com/antocorr/bubble/blob/main/ai-component-creation-prompt.md
 
 And the agents/claude skill ready to use.
 
-https://github.com/antocorr/bubble/blob/main/.claude/skills/bubble-components-pubsub
+https://github.com/antocorr/bubble/blob/main/.claude/skills/bubble-components-pubsub-plugins
 
 
-And this a test I made using GPT 5.1
+And this a test made using GPT 5.1 using the creation-prompt
 
 https://antocorr.github.io/bubble/examples/ai-bakery.html

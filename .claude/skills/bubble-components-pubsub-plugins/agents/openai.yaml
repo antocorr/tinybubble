@@ -1,0 +1,4 @@
+interface:
+  display_name: "Bubble Components + PubSub + Plugins"
+  short_description: "Bubble SFC conventions for props/emits, router, event topics, and bubble-translate wiring."
+  default_prompt: "Use antocorr/bubble runtime conventions. Always apply this skill for .bub.js/.bubble.js, Bubble pub-sub wiring, and Bubble i18n setup via plugins/bubble-translate/bubble.js. Enforce raw props access, bubble.events.topic patterns, and accumulable class/style behavior (preserve static base with :class/:style)."

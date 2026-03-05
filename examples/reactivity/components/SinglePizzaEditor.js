@@ -80,8 +80,9 @@ export default {
                             x-for="ing in ingredients">
                             <input class="h-4 w-4 rounded border-crust-300 text-basil-600 focus:ring-basil-200"
                                 type="checkbox"
+                                :value="ing.id"
                                 :checked="isIngredientSelected(ing.id)"
-                                @change="(e) => toggleIngredient(ing.id, e)" />
+                                @change="toggleIngredient($event)" />
                             <span class="text-sm text-stone-800">{{ ing.name }}</span>
                         </label>
                     </div>
@@ -119,10 +120,13 @@ export default {
         const ids = this.props.currentItem?.ingredientIds || [];
         return Array.isArray(ids) && ids.includes(ingredientId);
     },
-    toggleIngredient(ingredientId, evt) {
+    toggleIngredient(evt) {
         // Direct access to the proxied object
         const item = this.props.currentItem;
         if (!item) return;
+
+        const ingredientId = Number(evt?.target?.value);
+        if (!Number.isFinite(ingredientId)) return;
         
         const checked = !!evt?.target?.checked;
         const prev = Array.isArray(item.ingredientIds) ? item.ingredientIds : [];

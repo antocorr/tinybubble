@@ -1,10 +1,13 @@
 // bubble-router.js
-import { html, effect, createSignal, createComponent } from '../index.js';
+import { html, effect, createSignal, createComponent, globals, Signal, SignalObject } from '../index.js';
 
 export function createRouter({ mode = 'history', base = '/', routes = [], srcBase = null }) {
     const resolvedSrcBase = srcBase
         || (typeof document !== 'undefined' && document.currentScript ? document.currentScript.src : null)
         || (typeof window !== 'undefined' ? window.location.href : null);
+
+    const routeSignal = Signal({ path: '/', params: {}, query: {} });
+    globals.$route = routeSignal;
 
     function resolveRouteSrc(src) {
         // Allow absolute URLs or protocol-relative imports to pass through
@@ -122,13 +125,16 @@ export function createRouter({ mode = 'history', base = '/', routes = [], srcBas
     // component <RouterView/>
     function RouterView() {
         const outlet = html(`<div></div>`);
+        let mountedComp = null;
+        let mountedIsPersistent = false;
+
         effect(async () => {
             const current = getDestination();
-            
+
             // Trova la rotta corrispondente
             let match = null;
             let params = {};
-            
+
             for (const r of routes) {
                 const m = matchRoute(r.path, current);
                 if (m) {
@@ -138,7 +144,12 @@ export function createRouter({ mode = 'history', base = '/', routes = [], srcBas
                 }
             }
 
+            // Destroy previous component (skip persistent — it stays alive in memory)
+            if (mountedComp && !mountedIsPersistent) mountedComp.$destroy();
             outlet.innerHTML = '';
+            mountedComp = null;
+            mountedIsPersistent = false;
+
             if (match) {
                 if (match.src && !match.component) {
                     try {
@@ -149,11 +160,11 @@ export function createRouter({ mode = 'history', base = '/', routes = [], srcBas
                         return outlet;
                     }
                 }
-                
-                // Crea l'oggetto $route da iniettare
-                const $route = {
+
+                // Aggiorna il signal globale (tutte le istanze si aggiornano automaticamente)
+                routeSignal.value = {
                     path: current,
-                    params: params,
+                    params,
                     query: Object.fromEntries(new URLSearchParams(window.location.search))
                 };
 
@@ -161,30 +172,18 @@ export function createRouter({ mode = 'history', base = '/', routes = [], srcBas
                     let comp;
                     if (match.persistent && componentMemory.has(match.path)) {
                         comp = componentMemory.get(match.path);
-                        // Aggiorna $route se il componente è persistente
-                        if (comp.props.$route) {
-                            comp.props.$route.value = $route;
-                        }
-                        comp.$route = $route;
                     } else {
-                        // Passa $route sia in data (per init) che in props (per template)
-                        const instanceData = { ...(match.data || {}), $route };
-                        comp = createComponent(match.component, instanceData, { $route });
-                        
-                        // Aggiunge getter this.$route per accesso reattivo dal codice (sovrascrive la prop statica)
-                        Object.defineProperty(comp, '$route', {
-                            get() { return this.props.$route ? this.props.$route.value : undefined; },
-                            configurable: true
-                        });
-
+                        comp = createComponent(match.component, match.data || {});
                         if (match.persistent) {
                             componentMemory.set(match.path, comp);
                         }
                     }
                     outlet.appendChild(comp.$element);
+                    mountedComp = comp;
+                    mountedIsPersistent = !!match.persistent;
                 } else {
                     // Componente funzionale
-                    outlet.appendChild(match.component({ $route }));
+                    outlet.appendChild(match.component({ $route: routeSignal.value }));
                 }
                 return outlet;
             }

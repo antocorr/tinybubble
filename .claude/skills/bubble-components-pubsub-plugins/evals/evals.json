@@ -1,0 +1,23 @@
+{
+  "skill_name": "bubble-components-pubsub-plugins",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Crea un componente BubbleJS LobbyUsers.bubble.js che riceve users come prop, emette select quando clicco un utente, e usa bubble.events.topic('lobby') per ascoltare joined/left senza duplicare listener su re-init.",
+      "expected_output": "Componente con props/emits corretti, niente this.props.*.value, topic API bubble.events.topic con handler refs stabili e cleanup in beforeDestroy.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Refactor di App.bubble.js: registra router-link/router-view, usa router.navigate('/profile/42') su click bottone e correggi tutti gli attributi scritti come src=\"{{...}}\" o href=\"{{...}}\".",
+      "expected_output": "Router wiring corretta, navigate API usata, attributi convertiti a :src/:href, template con binding reattivi validi.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Imposta i18n Bubble con plugins/bubble-translate: bootstrap in main.js, await t.setLang(t.lang), e in Header.bubble.js aggiungi menu lingua EN/IT/ES con traduzioni reattive usando t('...').",
+      "expected_output": "Import da plugins/bubble-translate/bubble.js, globals.t disponibile nei template, cambio lingua via t.setLang, stato lingua aggiornato senza inizializzare traduttore per ogni render.",
+      "files": []
+    }
+  ]
+}

@@ -130,3 +130,4 @@ out
 .vscode/*
 .vs-code
 .claude/skills/browser-test
+.claude/settings.local.json

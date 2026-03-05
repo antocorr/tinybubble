@@ -1,4 +1,4 @@
-import { effect, Signal, SignalObject, watch, collectEffects, computed } from "./Signals.js";
+import { effect, Signal, SignalObject, watch, collectEffects, computed, registerDispose } from "./Signals.js";
 import { evaluate } from "./Evaluate.js";
 
 /**
@@ -367,6 +367,7 @@ function handleCustomComponent(el, component, localScope) {
         if (boundElements.has(el)) return;
 
         const childComp = createComponent(compDef, undefined, childProps, component, emitListeners);
+        registerDispose(() => childComp.$destroy());
         nativeEventBindings.forEach(({ eventName, expr }) => {
             childComp.$element.addEventListener(eventName, (event) => {
                 const scope = { ...buildScope(component, localScope), $event: event };
@@ -417,18 +418,40 @@ function handleAttributes(el, component, localScope) {
         if (attr.name.startsWith(':')) {
             const attrName = attr.name.substring(1);
             const expr = attr.value;
+            const baseAttr = (attrName === 'class' || attrName === 'style')
+                ? (el.getAttribute(attrName) || '').trim().replace(/;\s*$/, '')
+                : '';
             effect(() => {
                 const currentScope = buildScope(component, localScope);
                 const val = evaluate(expr, currentScope, component);
                 if (attrName === 'class') {
+                    let dynamicClass = '';
                     if (Array.isArray(val)) {
-                        el.className = val.filter(Boolean).join(' ');
+                        dynamicClass = val.filter(Boolean).join(' ');
                     } else if (val && typeof val === 'object') {
-                        el.className = Object.entries(val)
+                        dynamicClass = Object.entries(val)
                             .filter(([, v]) => v).map(([k]) => k).join(' ');
                     } else {
-                        el.setAttribute('class', val ?? '');
+                        dynamicClass = val ?? '';
                     }
+                    const nextClass = [baseAttr, String(dynamicClass).trim()].filter(Boolean).join(' ');
+                    if (nextClass) el.setAttribute('class', nextClass);
+                    else el.removeAttribute('class');
+                } else if (attrName === 'style') {
+                    let dynamicStyle = '';
+                    if (val && typeof val === 'object' && !Array.isArray(val)) {
+                        dynamicStyle = Object.entries(val)
+                            .filter(([, v]) => v !== false && v != null)
+                            .map(([k, v]) => `${k.replace(/([A-Z])/g, '-$1').toLowerCase()}: ${v}`)
+                            .join('; ');
+                    } else {
+                        dynamicStyle = val ?? '';
+                    }
+                    const nextStyle = [baseAttr, String(dynamicStyle).trim().replace(/;\s*$/, '')]
+                        .filter(Boolean)
+                        .join('; ');
+                    if (nextStyle) el.setAttribute('style', nextStyle);
+                    else el.removeAttribute('style');
                 } else if (val !== undefined && val !== null) {
                     if (BOOLEAN_ATTRS.has(attrName)) {
                         if (!val) el.removeAttribute(attrName);
@@ -505,7 +528,8 @@ export function createComponent(original, data, _props, parent = null, emitListe
         const el = original({ ...data, ..._props });
         return {
             $element: el,
-            appendTo: (parent) => { if (el) parent.appendChild(el); }
+            appendTo: (parent) => { if (el) parent.appendChild(el); },
+            $destroy: () => {}
         };
     }
 
@@ -575,7 +599,19 @@ export function createComponent(original, data, _props, parent = null, emitListe
 
     // 7. Start Binding
     if (component.$element) {
-        bindNode(component.$element, component, {});
+        component._disposers = collectEffects(() => bindNode(component.$element, component, {}));
+    }
+
+    component.$destroy = function () {
+        if (this.beforeDestroy) this.beforeDestroy();
+        this._disposers?.forEach(d => d());
+        if (this.destroy) this.destroy();
+    };
+
+    for (const key in globals) {
+        if (key.startsWith('$') && globals[key] instanceof SignalObject) {
+            Object.defineProperty(component, key, { get: () => globals[key].value, configurable: true });
+        }
     }
 
     // 8. Handle Scoped/Global CSS
@@ -609,7 +645,7 @@ function resolveSrc(src) {
 }
 
 export async function importComponent(src, data, _props, parent = null, emitListeners = {}) {
-    let comp = { appendTo: () => { }, $element: document.createElement('div') };
+    let comp = { appendTo: () => { }, $element: document.createElement('div'), $destroy: () => {} };
     try {
         src = resolveSrc(src);
         let compModule = componentCache[src];

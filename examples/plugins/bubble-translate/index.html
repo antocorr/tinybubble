@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Italian Bakers — bubble-translate demo</title>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "bubblejs": "../../../src/index.js"
+        }
+    }
+    </script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet" />
+
+    <style>
+        :root {
+            --cream: #fbf9f6;
+            --ink: #2a201e;
+            --muted: #8f857c;
+            --line: rgba(42, 32, 30, 0.12);
+            --accent: #9b5e27;
+            --accent2: #9e754f;
+        }
+
+        html, body { height: 100%; }
+
+        body {
+            background: var(--cream);
+            color: var(--ink);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+        }
+
+        .font-serif { font-family: "Playfair Display", ui-serif, Georgia, Cambria, "Times New Roman", Times, serif; }
+
+        .btn {
+            border-radius: 9999px;
+            padding: 0.6rem 1.05rem;
+            font-weight: 600;
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: transform 150ms ease, background-color 150ms ease, color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+        }
+        .btn:active { transform: translateY(1px); }
+        .btn-primary { background: var(--accent); color: white; box-shadow: 0 10px 18px rgba(155, 94, 39, 0.25); }
+        .btn-primary:hover { background: #8a5221; }
+        .btn-ghost { border: 1px solid rgba(255, 255, 255, 0.35); color: white; background: rgba(0, 0, 0, 0.25); backdrop-filter: blur(6px); }
+        .btn-ghost:hover { background: rgba(0, 0, 0, 0.35); }
+        .btn-outline { border: 1px solid var(--line); background: transparent; color: var(--ink); }
+        .btn-outline:hover { border-color: rgba(42, 32, 30, 0.28); box-shadow: 0 8px 18px rgba(42, 32, 30, 0.08); }
+        .soft-card { border: 1px solid var(--line); background: rgba(255, 255, 255, 0.55); backdrop-filter: blur(6px); border-radius: 1.25rem; box-shadow: 0 14px 30px rgba(42, 32, 30, 0.08); }
+        .thin-line { height: 1px; background: var(--line); }
+        .ring-soft { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55); }
+
+        /* Language picker */
+        .gl-icon-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 2rem;
+            height: 2rem;
+            border-radius: 0.5rem;
+            border: 1px solid var(--line);
+            background: transparent;
+            cursor: pointer;
+            color: var(--muted);
+            transition: background 150ms, color 150ms;
+        }
+        .gl-icon-btn:hover { background: rgba(42, 32, 30, 0.06); color: var(--ink); }
+        .gl-lang-menu {
+            position: absolute;
+            right: 0;
+            top: calc(100% + 0.5rem);
+            background: white;
+            border: 1px solid var(--line);
+            border-radius: 0.75rem;
+            box-shadow: 0 8px 24px rgba(42, 32, 30, 0.12);
+            padding: 0.375rem;
+            min-width: 9rem;
+            z-index: 200;
+        }
+        .gl-lang-opt {
+            display: block;
+            width: 100%;
+            text-align: left;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            color: var(--muted);
+            cursor: pointer;
+            background: transparent;
+            border: none;
+            transition: background 150ms, color 150ms;
+        }
+        .gl-lang-opt:hover { background: rgba(42, 32, 30, 0.05); color: var(--ink); }
+        .gl-lang-opt--active { color: var(--accent); font-weight: 600; }
+    </style>
+</head>
+
+<body>
+    <div id="app"></div>
+    <script src="components/app.js" type="module" defer></script>
+</body>
+
+</html>

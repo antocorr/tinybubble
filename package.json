@@ -1,14 +1,26 @@
 {
-  "name": "bubble",
+  "name": "bubblejs",
   "version": "1.0.0",
   "description": "",
   "main": "dist/bubble.js",
+  "exports": {
+    ".": "./dist/bubble.js",
+    "./events": "./dist/bubble-events.js",
+    "./full": "./dist/bubble-full.js"
+  },
   "directories": {
     "example": "examples"
   },
+  "files": [
+    "dist/",
+    "src/",
+    "ai-component-creation-prompt.md"
+  ],
   "scripts": {
     "build": "esbuild ./src/index.js --bundle --sourcemap --minify --format=esm --outfile=./dist/bubble.js; esbuild ./src/index-events.js --bundle --sourcemap --minify --format=esm --outfile=./dist/bubble-events.js; esbuild ./src/index-full.js --bundle --sourcemap --minify --format=esm --outfile=./dist/bubble-full.js",
-    "build-no-min": "esbuild ./src/index.js --bundle --sourcemap --format=esm --outfile=./dist/bubble.js"
+    "build-no-min": "esbuild ./src/index.js --bundle --sourcemap --format=esm --outfile=./dist/bubble.js",
+    "test:isolated": "npm --prefix tests run test",
+    "test:isolated:watch": "npm --prefix tests run test:watch"
   },
   "author": "",
   "license": "ISC",

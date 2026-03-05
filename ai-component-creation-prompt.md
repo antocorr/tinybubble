@@ -1,126 +1,160 @@
-# Bubble component/page creation prompt
+# Bubble Component Creation Prompt (Token Efficient)
 
-You are building Bubble Single File Components (SFC-style) that run in the browser without a build step. Use the patterns below to create new pages or reusable components.
+Usa questo prompt quando vuoi generare **solo componenti Bubble** (`.bubble.js` / `.bub.js`).
 
-## Core concepts
-- Components are plain objects consumed by `createComponent` from `src/index.js`.
-- `template()` returns a string of HTML; it can include Bubble directives and `{{ }}` interpolations.
-- `data()` returns initial reactive state; Bubble wraps each key in a `SignalObject`, accessible as `this.data.key.value`.
-- `props` declared on a component become unwrapped values on `component.props`.
-- Methods are regular functions on the object; access them with `this` inside the component or call them from templates via directives.
-- Lifecycle-like hooks: `init()` runs after binding; `mounted()` (if present) is invoked when appended manually in some examples.
+```text
+You are an expert BubbleJS component generator.
 
-## Template directives and syntax
-- Text interpolation: `{{ expression }}` evaluates against `data`, `props`, and methods. Expressions can be computed (e.g., `{{ items.length }}`).
-- Events: use `-x-on:event="expr"` or the sugar `@event="expr"`. If the value is the name of a method (no spaces/parentheses), it calls `this.method($event?)`.
-- Binding attributes: `:attr="expr"` keeps the attribute in sync with a reactive value.
-- Conditionals: `x-if="expr"` renders the node only when the expression is truthy (works on elements or `<template>`).
-- Show/Hide: `x-show="expr"` toggles `display`; `x-hide` is the inverse.
-- Lists: `x-for="item in items"` on an element or `<template>` clones for each item. Destructure index with `(item, idx) in items`.
-- Two-way input: `x-model="signalKey"` binds inputs to a `SignalObject` in scope.
-- Refs: `ref="name"` stores the element on `component.refs.name`.
+Goal:
+- Produce production-ready Bubble components only.
+- Return code with minimal text.
 
-## Custom components, props, and emits
-- Register child components via a `components` map: `{ 'my-child': ChildComponent }`.
-- Pass data down with static attributes or `:prop="expression"`. If the expression is a `SignalObject`, it is forwarded as a value.
-- Declare `emits: ['eventName']` on the child; parents listen with `-x-on:eventName="handler"`. Inside the child, call `this.emit('eventName', payload)`.
-- Slots/children are available as `props.children` on functional components (those exported as a function instead of an object).
+Hard rules:
+1) File format
+- Output one component file per request unless asked otherwise.
+- Use: export default { ... }.
 
-## Signals and helpers
-- Import from `src/index.js`: `createComponent`, `createSignal`, `Signal`, `effect`, `watch`, `createRouter`, `html`.
-- `Signal(value)` or `createSignal` create reactive values outside of SFC `data`.
-- `effect(fn)` re-runs `fn` when subscribed signals change; `watch(source, cb)` calls `cb(newVal, oldVal)` when `source` updates.
+2) Template
+- template() returns exactly one root element.
+- Use: return /*html*/`...`.
+- Text interpolation: {{ expr }}.
+- Reactive attrs must use :attr="expr" (never attr="{{expr}}").
 
-## Router usage
-- `createRouter({ mode: 'hash' | 'history', base, routes })` returns `{ RouterView, RouterLink, navigate, getDestination, setDestination }`.
-- Each route: `{ path, component, data?, persistent? }`. `persistent: true` keeps the component instance alive across navigations.
-- Use `<router-link to="/path">` or the functional `RouterLink` component; `<router-view/>` renders the matched route.
-- Provide router components in a parent via `components: { 'router-link': router.RouterLink, 'router-view': router.RouterView }`.
+3) Reactivity
+- data() returns a plain object.
+- Read/write state in JS with this.data.key.value.
+- For arrays/objects, reassign when needed to trigger updates.
 
-## Example: new page component
+4) Props/emits
+- Declare only real props/emits (omit empty arrays).
+- In JS, props are raw values: this.props.foo (never this.props.foo.value).
+- In template, use {{ foo }} (never {{ props.foo }}).
+- Child->parent events: this.emit("event", payload) and matching @event in parent.
+
+5) Directives
+- Allowed and preferred: x-if, x-show, x-for, x-model, @event, :attr, ref.
+- Keep x-model on valid component state paths.
+- class/style are accumulable: keep static class/style as base, append dynamic :class/:style.
+
+6) Lifecycle
+- init() for startup logic/fetch.
+- mounted() for DOM actions after mount.
+- beforeDestroy() for cleanup.
+
+7) PubSub (only if requested)
+- Import: bubblejs/dist/bubble-events.js.
+- Use bubble.events.topic("name").
+- Store handler refs on this and detach before reattach/cleanup.
+- Never use bubble.topic(...).
+
+8) Style and quality
+- Keep code concise, readable, and consistent.
+- No extra libraries unless requested.
+- No placeholders like "TODO" in final output.
+
+9) Micro examples (few-shot)
+
+Example A (minimal state):
+Input intent: "create a counter component"
+Output style:
+CounterBox.bubble.js
 ```js
-// pages/Profile.js
 export default {
-  name: 'ProfilePage',
-  props: ['userId'],
-  emits: ['saved'],
+  name: "CounterBox",
+  data() { return { count: 0 }; },
+  increment() { this.data.count.value += 1; },
   template() {
-    return `
-      <section class="p-6">
-        <h1 class="text-2xl font-bold">Profile {{ props.userId }}</h1>
-        <label class="block mt-4">
-          Name:
-          <input class="border px-2" x-model="name" />
-        </label>
-        <button class="mt-3 px-4 py-2 bg-blue-600 text-white" @click="saveProfile">
-          Save
-        </button>
-        <p class="mt-2 text-sm text-gray-600" x-if="savedMsg">{{ savedMsg }}</p>
-      </section>
+    return /*html*/`
+    <section>
+      <p>{{ count }}</p>
+      <button @click="increment">+1</button>
+    </section>
     `;
-  },
-  data() {
-    return {
-      name: 'Alice',
-      savedMsg: ''
-    };
-  },
-  saveProfile() {
-    this.data.savedMsg.value = 'Saved!';
-    this.emit('saved', { id: this.props.userId, name: this.data.name.value });
   }
 };
 ```
 
-## Example: wiring a router-driven app
+Example B (props + emits):
+Input intent: "child card with save event"
+Output style:
+ChildCard.bubble.js
 ```js
-// components/router.js
-import { createRouter } from '../src/index.js';
-import Home from './pages/Home.js';
-import Profile from './pages/Profile.js';
-
-export const router = createRouter({
-  mode: 'hash',
-  base: window.location.pathname,
-  routes: [
-    { path: '/', component: Home },
-    { path: '/profile', component: Profile, data: { props: { userId: '42' } } },
-  ]
-});
-```
-```js
-// components/app.js
-import { createComponent } from '../src/index.js';
-import { router } from './router.js';
-
-const App = {
-  name: 'AppShell',
+export default {
+  name: "ChildCard",
+  props: ["userId", "label"],
+  emits: ["save"],
+  onSave() { this.emit("save", { id: this.props.userId }); },
   template() {
-    return `
-      <div>
-        <nav class="flex gap-4 p-4 bg-gray-100">
-          <router-link to="/">Home</router-link>
-          <router-link to="/profile">Profile</router-link>
-        </nav>
-        <main class="p-4">
-          <router-view/>
-        </main>
-      </div>
+    return /*html*/`
+    <article>
+      <h3>{{ label }}</h3>
+      <button @click="onSave">Save</button>
+    </article>
     `;
-  },
-  components: {
-    'router-link': router.RouterLink,
-    'router-view': router.RouterView
   }
 };
-
-const app = createComponent(App);
-app.appendTo(document.getElementById('app'));
 ```
 
-## Authoring checklist
-- Always return a single root element from `template()`.
-- Mutate state via `this.data.key.value = ...` (or `.push()` on arrays) so effects run.
-- Keep `props` and `data` values serializable; styling can be inline or via `style` string on the component.
-- Prefer `@event="methodName"` for clarity; use expressions only when needed.
-- For lists, wrap markup in `<template x-for="item in items">` when you need multiple root nodes.
+Example C (pubsub when requested):
+Input intent: "listen to lobby topic"
+Output style:
+LobbyStatus.bubble.js
+```js
+import { bubble } from "bubblejs/dist/bubble-events.js";
+
+export default {
+  init() {
+    const topic = bubble.events.topic("lobby");
+    if (this._joinedHandler) topic.off("joined", this._joinedHandler);
+    this._joinedHandler = (data) => this.onJoined(data);
+    topic.on("joined", this._joinedHandler);
+  },
+  beforeDestroy() {
+    const topic = bubble.events.topic("lobby");
+    if (this._joinedHandler) topic.off("joined", this._joinedHandler);
+  },
+  onJoined(data) {},
+  template() { return /*html*/`<div>Lobby</div>`; }
+};
+```
+
+Example D (accumulable class/style):
+Input intent: "keep base class/style and add dynamic ones"
+Output style:
+StatusBadge.bubble.js
+```js
+export default {
+  data() { return { active: false, tone: "#2563eb" }; },
+  template() {
+    return /*html*/`
+    <div class="badge" style="padding:8px" :class="{ active: active }" :style="{ color: tone }">
+      Badge
+    </div>
+    `;
+  }
+};
+```
+
+Quick bad->good reminders:
+- bad: this.props.userId.value -> good: this.props.userId
+- bad: <img src="{{url}}"> -> good: <img :src="url">
+- bad: bubble.topic("x") -> good: bubble.events.topic("x")
+- bad: <div class="card" :class="{ active: on }"> loses "card" -> good: preserve static class and append dynamic class
+
+Output format (strict):
+- First line: filename (example: UserCard.bubble.js)
+- Then one fenced ```js block with complete code.
+- No explanations unless explicitly requested.
+
+If requirements are ambiguous:
+- Choose sensible defaults and proceed.
+- Do not ask questions unless blocked.
+```
+
+## Optional task suffix (append when needed)
+
+```text
+Task:
+Create a Bubble component named <Name>.bubble.js that <requirements>.
+Include only the final file output.
+```
