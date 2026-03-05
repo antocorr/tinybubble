@@ -1,16 +1,16 @@
-# BubbleJs another micro javascript UI library
+# TinyBubble another micro javascript UI library
 A micro (less than **5kb** gzipped ) reactive vanilla javascript UI component **standalone** library based on Signals and pub sub.
 
 ## Import the library
 ### As a ES-6 module (recommended) from CDN
 ```javascript
-import { createComponent } from "https://cdn.jsdelivr.net/npm/bubblejs/dist/bubble.js"
+import { createComponent } from "https://cdn.jsdelivr.net/npm/tinybubble/dist/bubble.js"
 ```
 
 ### Import via npm
 
 ```shell
-npm i bubblejs
+npm i tinybubble
 ```
 
 
@@ -52,7 +52,7 @@ export default {
 
 ```javascript
 //in your main js file
-import { createComponent } from "bubblejs";
+import { createComponent } from "tinybubble";
 import MyComponent from "./components/MyComponent.js";
 const override = { name 'Hadouken', props: { counter: 5, character: 'Ryu'} };
 const myComponent = createComponent(MyComponent,  override);
@@ -94,7 +94,7 @@ Use the built-in event bus when you need two components to talk without a direct
 
 ```javascript
 //in any component, parent, children, sibling
-import { bubble } from "bubblejs/dist/bubble-events.js";
+import { bubble } from "tinybubble/events";
 
 bubble.events.topic('layout').emit('resize', 'small');
 
@@ -113,7 +113,7 @@ bubble.events.topic("layout").on('resize', (size) => {
 Register any function once and use it in every component template without importing it per-component.
 
 ```javascript
-import { globals } from "bubblejs";
+import { globals } from "tinybubble";
 import { t } from "./i18n.js";
 
 globals.t = t;
@@ -129,11 +129,11 @@ Component methods, data, and props always take precedence over mixin keys, so th
 
 ### Easy routing included
 
-Bubble ships with a tiny router so you can wire navigation without extra deps. Declare your routes, drop `<router-link>` and `<router-view>` into your layout, and Bubble handles hash/history navigation plus optional persistent pages.
+TinyBubble ships with a tiny router so you can wire navigation without extra deps. Declare your routes, drop `<router-link>` and `<router-view>` into your layout, and TinyBubble handles hash/history navigation plus optional persistent pages.
 
 ```javascript
 // router.js
-import { createRouter } from "bubblejs";
+import { createRouter } from "tinybubble";
 import Home from "./pages/Home.js";
 import About from "./pages/About.js";
 
@@ -150,7 +150,7 @@ export const router = createRouter({
 
 ```javascript
 // App.js
-import { createComponent } from "bubblejs";
+import { createComponent } from "tinybubble";
 import { router } from "./router.js";
 
 export default {
@@ -191,7 +191,7 @@ export const router = createRouter({
 
 ```javascript
 // Lazy widget anywhere else
-import { importComponent } from "bubblejs";
+import { importComponent } from "tinybubble";
 
 async function mountWidget(host) {
   const src = new URL("./components/ChartWidget.js", import.meta.url).href;
@@ -214,7 +214,7 @@ router: https://antocorr.github.io/bubble/examples/router/index.html
 
 Being small and relatively simple (the minified version is just 4k tokens) and by pairing it with tailwind you can create all sort of components usin any LLM.
 
-Bubble is especially AI-friendly because the whole core mental model (templating directives, signals-based reactivity, and router) is clear and small, so an LLM can keep almost the entire framework behavior in context while generating or refactoring components.
+TinyBubble is especially AI-friendly because the whole core mental model (templating directives, signals-based reactivity, and router) is clear and small, so an LLM can keep almost the entire framework behavior in context while generating or refactoring components.
 
 There is also a prompt ready to use here
 

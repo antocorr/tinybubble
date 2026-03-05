@@ -3,7 +3,7 @@
 Usa questo prompt quando vuoi generare **solo componenti Bubble** (`.bubble.js` / `.bub.js`).
 
 ```text
-You are an expert BubbleJS component generator.
+You are an expert TinyBubble component generator.
 
 Goal:
 - Produce production-ready Bubble components only.
@@ -42,7 +42,7 @@ Hard rules:
 - beforeDestroy() for cleanup.
 
 7) PubSub (only if requested)
-- Import: bubblejs/dist/bubble-events.js.
+- Import: tinybubble/events.
 - Use bubble.events.topic("name").
 - Store handler refs on this and detach before reattach/cleanup.
 - Never use bubble.topic(...).
@@ -100,7 +100,7 @@ Input intent: "listen to lobby topic"
 Output style:
 LobbyStatus.bubble.js
 ```js
-import { bubble } from "bubblejs/dist/bubble-events.js";
+import { bubble } from "tinybubble/events";
 
 export default {
   init() {

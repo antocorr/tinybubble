@@ -12,7 +12,7 @@ For Bubble apps, prefer `plugins/bubble-translate/bubble.js`.
 ## Bubble Bootstrap Pattern
 
 ```js
-import { createComponent } from "bubblejs";
+import { createComponent } from "tinybubble";
 import { createTranslate } from "./plugins/bubble-translate/bubble.js";
 import App from "./components/App.bubble.js";
 
@@ -51,7 +51,7 @@ Translator behavior:
 ## Component Usage Pattern
 
 ```js
-import { globals } from "bubblejs";
+import { globals } from "tinybubble";
 
 export default {
     data() {

@@ -137,7 +137,7 @@ Rules:
 To react to prop changes in JS:
 
 ```js
-import { watchProp } from "bubblejs";
+import { watchProp } from "tinybubble";
 
 mounted() {
     watchProp(this, "userId", (newVal, oldVal) => {
@@ -168,7 +168,7 @@ Use topics when components need cross-component communication (siblings, distant
 Pub-sub keeps those interactions decoupled from component hierarchy.
 
 ```js
-import { bubble } from "bubblejs/dist/bubble-events.js";
+import { bubble } from "tinybubble/events";
 
 export default {
     init() {
@@ -205,7 +205,7 @@ Rules:
 ## 6. Router
 
 ```js
-import { createRouter } from "bubblejs";
+import { createRouter } from "tinybubble";
 
 export const router = createRouter({
     mode: "hash",
@@ -247,7 +247,7 @@ Use `plugins/bubble-translate/bubble.js` for Bubble apps.
 ### Bootstrap once
 
 ```js
-import { createComponent } from "bubblejs";
+import { createComponent } from "tinybubble";
 import { createTranslate } from "./plugins/bubble-translate/bubble.js";
 import App from "./components/App.bubble.js";
 
@@ -271,7 +271,7 @@ What this gives you:
 ### In components
 
 ```js
-import { globals } from "bubblejs";
+import { globals } from "tinybubble";
 
 export default {
     data() {

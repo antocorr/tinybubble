@@ -1,4 +1,4 @@
-import { globals, Signal } from "bubblejs";
+import { globals, Signal } from "tinybubble";
 import { Translator } from "./index.js";
 
 function createTranslate(config = {}) {

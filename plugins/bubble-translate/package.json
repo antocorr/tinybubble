@@ -10,11 +10,11 @@
         "./vue": "./vue.js"
     },
     "peerDependencies": {
-        "bubblejs": ">=1.0.0",
+        "tinybubble": ">=1.0.0",
         "vue": ">=3.0.0"
     },
     "peerDependenciesMeta": {
-        "bubblejs": { "optional": true },
+        "tinybubble": { "optional": true },
         "vue": { "optional": true }
     },
     "keywords": ["bubble", "translate", "vue", "localization"],

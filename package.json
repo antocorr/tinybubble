@@ -1,6 +1,6 @@
 {
-  "name": "bubblejs",
-  "version": "1.0.0",
+  "name": "tinybubble",
+  "version": "1.0.1",
   "description": "",
   "main": "dist/bubble.js",
   "exports": {

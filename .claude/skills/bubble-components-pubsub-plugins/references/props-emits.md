@@ -42,7 +42,7 @@ Parent:
 ## Watching Prop Changes
 
 ```js
-import { watchProp } from "bubblejs";
+import { watchProp } from "tinybubble";
 
 export default {
     props: ["userId"],

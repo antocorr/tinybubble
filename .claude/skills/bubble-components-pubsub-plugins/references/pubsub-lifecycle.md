@@ -6,7 +6,7 @@ This avoids passing callbacks and props through multiple intermediate layers.
 ## Quick Pattern
 
 ```js
-import { bubble } from "bubblejs/dist/bubble-events.js";
+import { bubble } from "tinybubble/events";
 
 export default {
     init() {
