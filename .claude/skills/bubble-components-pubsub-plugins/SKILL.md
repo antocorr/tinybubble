@@ -94,6 +94,8 @@ Critical:
 - `attr="{{signal}}"` does not create reactive attributes, always use `:attr="expr"`
 - In templates use `{{ foo }}`, not `{{ props.foo }}`
 - `class` and `style` are accumulable: static values are preserved as base and `:class`/`:style` appends dynamic values on re-renders
+- Runtime event caveat: for `@input` and `@change`, bare handlers (for example `@change="onChange"`) receive `(newValue, oldValue)`.
+- If you need the DOM event (for example file upload with `event.target.files`), pass `$event` explicitly: `@change="onFileChange($event)"`.
 
 ---
 

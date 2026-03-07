@@ -4,7 +4,11 @@
       "mcp__ide__getDiagnostics",
       "Bash(agent-browser *)",
       "Bash(grep:*)",
-      "Skill(agent-browser)"
+      "Skill(agent-browser)",
+      "Bash(npm run:*)",
+      "Bash(python:*)",
+      "Bash(lsof:*)",
+      "Bash(curl:*)"
     ]
   }
 }

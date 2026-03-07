@@ -1,0 +1,62 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "TinyBubble Template Injection",
+  "scopeName": "source.tinybubble.injection",
+  "injectionSelector": "L:source.js, L:source.js.jsx, L:source.ts, L:source.tsx",
+  "patterns": [
+    {
+      "include": "#templateMethod"
+    },
+    {
+      "include": "#htmlCommentTemplateLiteral"
+    }
+  ],
+  "repository": {
+    "templateMethod": {
+      "name": "meta.function.tinybubble.template",
+      "begin": "\\b(?:template|setTemplate)\\s*\\(\\s*\\)\\s*\\{",
+      "end": "^\\s*\\}",
+      "patterns": [
+        {
+          "include": "#returnHtmlTemplateLiteral"
+        }
+      ]
+    },
+    "returnHtmlTemplateLiteral": {
+      "name": "meta.embedded.block.tinybubble.html",
+      "begin": "\\breturn\\s*(?:/\\*\\s*html\\s*\\*/\\s*)?`",
+      "end": "`\\s*;?",
+      "patterns": [
+        {
+          "include": "#templateInterpolation"
+        },
+        {
+          "include": "text.html.basic"
+        }
+      ]
+    },
+    "htmlCommentTemplateLiteral": {
+      "name": "meta.embedded.block.tinybubble.html",
+      "begin": "/\\*\\s*html\\s*\\*/\\s*`",
+      "end": "`",
+      "patterns": [
+        {
+          "include": "#templateInterpolation"
+        },
+        {
+          "include": "text.html.basic"
+        }
+      ]
+    },
+    "templateInterpolation": {
+      "name": "meta.interpolation.tinybubble",
+      "begin": "\\$\\{",
+      "end": "\\}",
+      "patterns": [
+        {
+          "include": "source.js"
+        }
+      ]
+    }
+  }
+}

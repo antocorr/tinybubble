@@ -35,6 +35,8 @@ Hard rules:
 - Allowed and preferred: x-if, x-show, x-for, x-model, @event, :attr, ref.
 - Keep x-model on valid component state paths.
 - class/style are accumulable: keep static class/style as base, append dynamic :class/:style.
+- Runtime caveat: for bare `@input`/`@change` handlers (example `@change="onChange"`), Bubble passes `(newValue, oldValue)`.
+- If handler needs native event fields (example file uploads with `target.files`), always pass `$event` explicitly: `@change="onFileChange($event)"`.
 
 6) Lifecycle
 - init() for startup logic/fetch.
@@ -47,12 +49,19 @@ Hard rules:
 - Store handler refs on this and detach before reattach/cleanup.
 - Never use bubble.topic(...).
 
-8) Style and quality
+8) Imports and bootstrap references
+- For app/bootstrap code, import TinyBubble from npm with: import { createComponent } from "tinybubble".
+- For CDN/bootstrap examples, use: import { createComponent } from "https://cdn.jsdelivr.net/npm/tinybubble/dist/bubble.js".
+- For pubsub, use: import { bubble } from "tinybubble/events".
+- For router/helpers, import from "tinybubble".
+- In component-only outputs, do not import createComponent unless the request explicitly asks for bootstrap code too.
+
+9) Style and quality
 - Keep code concise, readable, and consistent.
 - No extra libraries unless requested.
 - No placeholders like "TODO" in final output.
 
-9) Micro examples (few-shot)
+10) Micro examples (few-shot)
 
 Example A (minimal state):
 Input intent: "create a counter component"
@@ -139,7 +148,10 @@ Quick bad->good reminders:
 - bad: this.props.userId.value -> good: this.props.userId
 - bad: <img src="{{url}}"> -> good: <img :src="url">
 - bad: bubble.topic("x") -> good: bubble.events.topic("x")
+- bad: import { bubble } from "tinybubble" -> good: import { bubble } from "tinybubble/events"
+- bad: import { createComponent } from "bubble" -> good: import { createComponent } from "tinybubble"
 - bad: <div class="card" :class="{ active: on }"> loses "card" -> good: preserve static class and append dynamic class
+- bad: <input type="file" @change="onFileChange"> when you need files -> good: <input type="file" @change="onFileChange($event)">
 
 Output format (strict):
 - First line: filename (example: UserCard.bubble.js)

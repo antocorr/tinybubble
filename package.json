@@ -1,6 +1,6 @@
 {
   "name": "tinybubble",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "",
   "main": "dist/bubble.js",
   "exports": {
@@ -23,7 +23,15 @@
     "test:isolated:watch": "npm --prefix tests run test:watch"
   },
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/antocorr/tinybubble.git"
+  },
+  "homepage": "https://github.com/antocorr/tinybubble#readme",
+  "bugs": {
+    "url": "https://github.com/antocorr/tinybubble/issues"
+  },
   "devDependencies": {
     "esbuild": "0.23.1"
   }

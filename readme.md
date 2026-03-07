@@ -12,7 +12,24 @@ import { createComponent } from "https://cdn.jsdelivr.net/npm/tinybubble/dist/bu
 ```shell
 npm i tinybubble
 ```
+## AI FRIENDLY
 
+Being small and relatively simple (the minified version is just 4k tokens) and by pairing it with tailwind you can create all sort of components usin any LLM.
+
+TinyBubble is especially AI-friendly because the whole core mental model (templating directives, signals-based reactivity, and router) is clear and small, so an LLM can keep almost the entire framework behavior in context while generating or refactoring components.
+
+There is also a prompt ready to use here
+
+https://github.com/antocorr/tinybubble/blob/main/ai-component-creation-prompt.md
+
+And the agents/claude skill ready to use.
+
+https://github.com/antocorr/tinybubble/tree/main/.claude/skills/bubble-components-pubsub-plugins
+
+
+And this a test made using GPT 5.1 using the creation-prompt
+
+https://antocorr.github.io/tinybubble/examples/ai-bakery.html
 
 ## Using the library
 
@@ -202,29 +219,10 @@ async function mountWidget(host) {
 
 ## Examples
 
-basic example: https://antocorr.github.io/bubble/examples/reactivity/basic.html
+basic example: https://antocorr.github.io/tinybubble/examples/reactivity/basic.html
 
-effect example: https://antocorr.github.io/bubble/examples/reactivity/effect.html
+effect example: https://antocorr.github.io/tinybubble/examples/reactivity/effect.html
 
-example: https://antocorr.github.io/bubble/examples/reactivity/shoelace.html
+example: https://antocorr.github.io/tinybubble/examples/reactivity/shoelace.html
 
-router: https://antocorr.github.io/bubble/examples/router/index.html
-
-## AI FRIENDLY
-
-Being small and relatively simple (the minified version is just 4k tokens) and by pairing it with tailwind you can create all sort of components usin any LLM.
-
-TinyBubble is especially AI-friendly because the whole core mental model (templating directives, signals-based reactivity, and router) is clear and small, so an LLM can keep almost the entire framework behavior in context while generating or refactoring components.
-
-There is also a prompt ready to use here
-
-https://github.com/antocorr/bubble/blob/main/ai-component-creation-prompt.md
-
-And the agents/claude skill ready to use.
-
-https://github.com/antocorr/bubble/blob/main/.claude/skills/bubble-components-pubsub-plugins
-
-
-And this a test made using GPT 5.1 using the creation-prompt
-
-https://antocorr.github.io/bubble/examples/ai-bakery.html
+router: https://antocorr.github.io/tinybubble/examples/router/index.html

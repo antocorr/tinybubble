@@ -1,0 +1,64 @@
+{
+  "name": "tinybubble-template-tools",
+  "displayName": "TinyBubble Template Tools",
+  "description": "HTML highlighting and template folding for TinyBubble components.",
+  "version": "0.0.4",
+  "publisher": "antocorr",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:javascript",
+    "onLanguage:javascriptreact",
+    "onLanguage:typescript",
+    "onLanguage:typescriptreact"
+  ],
+  "files": [
+    "extension.js",
+    "syntaxes/**",
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md",
+    "package.json"
+  ],
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "tinybubble",
+    "bubble",
+    "template",
+    "html",
+    "syntax"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/antocorr/tinybubble"
+  },
+  "homepage": "https://github.com/antocorr/tinybubble/tree/main/tools/vscode-tinybubble-template",
+  "bugs": {
+    "url": "https://github.com/antocorr/tinybubble/issues"
+  },
+  "contributes": {
+    "grammars": [
+      {
+        "scopeName": "source.tinybubble.injection",
+        "path": "./syntaxes/tinybubble-template.injection.tmLanguage.json",
+        "injectTo": [
+          "source.js",
+          "source.js.jsx",
+          "source.ts",
+          "source.tsx"
+        ],
+        "embeddedLanguages": {
+          "meta.embedded.block.tinybubble.html": "text.html.basic"
+        }
+      }
+    ]
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^3.7.1"
+  }
+}

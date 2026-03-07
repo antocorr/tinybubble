@@ -37,6 +37,7 @@ export default {
 <div style="padding:8px" :style="{ color: tone }"></div>
 <button @click="submit">Submit</button>
 <input @input="onInput($event)">
+<input type="file" @change="onFileChange($event)">
 <p x-if="isLoggedIn">Welcome</p>
 <p x-show="isLoggedIn">Welcome</p>
 <input x-model="formField">
@@ -80,3 +81,4 @@ export default {
 - State writes use `this.data.key.value = next`
 - Avoid `x-if` on a component root that should persist; prefer parent wrapper or `x-show`
 - Keep template expressions light; move logic to methods when complex
+- For `@input`/`@change`, bare handlers receive `(newValue, oldValue)`; use `$event` explicitly when you need full event data (for example `target.files`).

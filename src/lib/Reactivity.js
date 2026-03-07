@@ -282,7 +282,7 @@ function handleEvents(el, component, localScope) {
                 if (prevent) event.preventDefault();
                 const scope = { ...buildScope(component, localScope), $event: event };
                 if (['input', 'change'].includes(eventName)) {
-                    invokeExpr(expr, component, scope, [event.target.value, oldVal]);
+                    invokeExpr(expr, component, scope, [event.target.value, oldVal, event]);
                     oldVal = event.target.value;
                 } else {
                     invokeExpr(expr, component, scope, [event]);
