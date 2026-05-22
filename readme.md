@@ -1,5 +1,11 @@
-# TinyBubble another micro javascript UI library
-A micro (less than **5kb** gzipped ) reactive vanilla javascript UI component **standalone** library based on Signals and pub sub.
+# TinyBubble — micro reactive UI library
+A modular reactive vanilla JavaScript UI library based on Signals and pub/sub.
+
+| Bundle | Includes | Gzipped |
+|---|---|---|
+| `bubble.js` | Signals, reactivity engine, router | **~5 kb** |
+| `bubble-events.js` | Pub/sub, EventTopic, JobManager | **+1 kb** |
+| `bubble-full.js` | Everything | **~6 kb** |
 
 ## Import the library
 ### As a ES-6 module (recommended) from CDN

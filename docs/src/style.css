@@ -1,0 +1,79 @@
+@import 'highlight.js/styles/github-dark-dimmed.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* -------------------------------------------------------
+   Code blocks
+   ------------------------------------------------------- */
+pre code.hljs {
+  @apply rounded-lg text-sm font-mono leading-relaxed;
+  padding: 1.25rem 1.5rem !important;
+}
+
+.code-block-wrapper {
+  @apply relative;
+}
+
+.copy-btn {
+  @apply absolute top-3 right-3 px-2 py-1 text-xs font-medium rounded
+         bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-white
+         transition-colors opacity-0 group-hover:opacity-100;
+}
+
+/* -------------------------------------------------------
+   Prose overrides for dark mode
+   ------------------------------------------------------- */
+.dark .prose {
+  --tw-prose-body: theme('colors.gray.300');
+  --tw-prose-headings: theme('colors.white');
+  --tw-prose-lead: theme('colors.gray.400');
+  --tw-prose-links: theme('colors.brand.400');
+  --tw-prose-bold: theme('colors.white');
+  --tw-prose-counters: theme('colors.gray.400');
+  --tw-prose-bullets: theme('colors.gray.600');
+  --tw-prose-hr: theme('colors.gray.700');
+  --tw-prose-quotes: theme('colors.gray.100');
+  --tw-prose-quote-borders: theme('colors.brand.600');
+  --tw-prose-captions: theme('colors.gray.400');
+  --tw-prose-code: theme('colors.brand.300');
+  --tw-prose-pre-code: theme('colors.gray.200');
+  --tw-prose-pre-bg: theme('colors.gray.900');
+  --tw-prose-th-borders: theme('colors.gray.600');
+  --tw-prose-td-borders: theme('colors.gray.700');
+}
+
+.prose :where(code):not(:where(pre code)) {
+  @apply px-1.5 py-0.5 rounded text-sm
+         bg-brand-50 text-brand-700
+         dark:bg-gray-800 dark:text-brand-300
+         font-mono;
+  font-weight: 500;
+}
+.prose :where(code):not(:where(pre code))::before,
+.prose :where(code):not(:where(pre code))::after {
+  content: '' !important;
+}
+
+/* -------------------------------------------------------
+   Sidebar nav active link
+   ------------------------------------------------------- */
+.nav-link-active {
+  @apply text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/20 font-medium;
+}
+
+/* -------------------------------------------------------
+   Smooth scrolling
+   ------------------------------------------------------- */
+html {
+  scroll-behavior: smooth;
+}
+
+/* -------------------------------------------------------
+   Custom scrollbar (webkit)
+   ------------------------------------------------------- */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { @apply bg-transparent; }
+::-webkit-scrollbar-thumb { @apply rounded-full bg-gray-300 dark:bg-gray-700; }
+::-webkit-scrollbar-thumb:hover { @apply bg-gray-400 dark:bg-gray-600; }

@@ -132,3 +132,7 @@ out
 .vs-code
 .claude/skills/browser-test
 .claude/settings.local.json
+
+# Docs site build artifacts
+docs/node_modules/
+docs/dist/
