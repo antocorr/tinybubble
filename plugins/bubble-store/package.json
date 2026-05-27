@@ -1,0 +1,19 @@
+{
+    "name": "bubble-store",
+    "version": "0.1.0",
+    "type": "module",
+    "description": "Redux-like store with memoized selectors and tinybubble Signal integration",
+    "main": "index.js",
+    "exports": {
+        ".": "./index.js",
+        "./bubble": "./bubble.js"
+    },
+    "peerDependencies": {
+        "tinybubble": ">=1.0.0"
+    },
+    "peerDependenciesMeta": {
+        "tinybubble": { "optional": true }
+    },
+    "keywords": ["bubble", "store", "redux", "signals", "state-management"],
+    "license": "MIT"
+}

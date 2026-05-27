@@ -16,6 +16,15 @@ const styleTagsAdded = new Set();
 
 export const globals = {};
 
+/**
+ * Register a global helper function available in all templates as $name(...)
+ * @param {string} name - helper name, with or without leading $
+ * @param {Function} fn
+ */
+export function registerHelper(name, fn) {
+    globals[name.startsWith('$') ? name : `$${name}`] = fn;
+}
+
 const BOOLEAN_ATTRS = new Set([
     'disabled', 'checked', 'selected', 'readonly', 'required',
     'hidden', 'open', 'multiple', 'autofocus',
@@ -609,8 +618,11 @@ export function createComponent(original, data, _props, parent = null, emitListe
     };
 
     for (const key in globals) {
-        if (key.startsWith('$') && globals[key] instanceof SignalObject) {
+        if (!key.startsWith('$')) continue;
+        if (globals[key] instanceof SignalObject) {
             Object.defineProperty(component, key, { get: () => globals[key].value, configurable: true });
+        } else if (typeof globals[key] === 'function') {
+            component[key] = globals[key];
         }
     }
 

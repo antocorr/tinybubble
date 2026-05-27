@@ -131,9 +131,46 @@ bubble.events.topic("layout").on('resize', (size) => {
 
 ```
 
-### Global template helpers via globals
+### Global template helpers
 
-Register any function once and use it in every component template without importing it per-component.
+Register a function once and use it in every component template — no per-component import needed.
+
+Use `registerHelper` for utility functions you want to call with the `$` prefix convention:
+
+```javascript
+import { registerHelper } from "tinybubble";
+
+registerHelper('formatDateTime', (value) =>
+    new Intl.DateTimeFormat('it-IT', { dateStyle: 'long', timeStyle: 'short' }).format(new Date(value))
+);
+
+registerHelper('formatCurrency', (value, currency = 'EUR') =>
+    new Intl.NumberFormat('it-IT', { style: 'currency', currency }).format(value)
+);
+```
+
+```html
+<!-- inside any component template, including child components -->
+<span>{{ $formatDateTime(tournament.joinClosesAt) }}</span>
+<span>{{ $formatCurrency(tournament.prizePool) }}</span>
+```
+
+The `$` prefix is added automatically if omitted from the name. You can also pass `$name` directly — both forms are equivalent.
+
+Helper functions registered with `registerHelper` are also available inside component methods as `this.$name(...)`:
+
+```javascript
+const MyComponent = {
+    buildSummary() {
+        // this.$formatDateTime and this.$formatCurrency available here too
+        return this.data.tournaments.value.map(t =>
+            `${t.name}: ${this.$formatDateTime(t.startsAt)} — ${this.$formatCurrency(t.prizePool)}`
+        ).join('\n');
+    }
+};
+```
+
+For plain globals without the `$` convention (e.g. an i18n `t()` function), use the `globals` object directly:
 
 ```javascript
 import { globals } from "tinybubble";
@@ -143,12 +180,90 @@ globals.t = t;
 ```
 
 ```html
-<!-- inside any component template -->
 <p>{{ t('welcome_message') }}</p>
-<button :title="t('save')">Save</button>
 ```
 
-Component methods, data, and props always take precedence over mixin keys, so there are no accidental overrides.
+Component methods, data, and props always take precedence over globals, so there are no accidental overrides.
+
+See the full working example: [`examples/reactivity/helpers.html`](examples/reactivity/helpers.html)
+
+### State management — bubble-store plugin
+
+`bubble-store` is an optional plugin that brings Redux-style state management with full Signal integration. Install it from `plugins/bubble-store`.
+
+**What it includes:**
+- `createStore(rootReducer, initialState, devtools?)` — Redux-like store with optional Redux DevTools support
+- `createSelector` / `createSelectorFactory` / `createStructuredSelector` — memoized selectors (Reselect-inspired)
+- `createBubbleStore(store)` — bridge that wires any Redux-like store into tinybubble's Signal reactivity
+- `connectStore(componentDef, mapStateToData)` — HOC that binds a component to the store
+
+**Setup (`store.js`) — once per project:**
+
+```javascript
+import { createStore }       from 'bubble-store';
+import { createBubbleStore } from 'bubble-store/bubble';
+import rootReducer            from './reducers/index.js';
+
+const store = createStore(rootReducer, {});
+export const { connectStore, dispatch, getState } = createBubbleStore(store);
+```
+
+**Using `connectStore` in a component:**
+
+```javascript
+import { connectStore, dispatch } from './store.js';
+import { selectCartCount }        from './selectors/cart.selectors.js';
+
+export default connectStore({
+    data() { return { cartCount: 0, items: [] }; },
+
+    template() {
+        return `<div>
+            <span>{{cartCount}} items in cart</span>
+            <div x-for="item in items">
+                <span>{{item.name}}</span>
+                <button @click="this.remove(item)">Remove</button>
+            </div>
+        </div>`;
+    },
+
+    remove(item) {
+        dispatch({ type: 'CART_REMOVE', payload: item.id });
+    },
+
+}, (state) => ({
+    cartCount: selectCartCount(state),
+    items:     state.cart.items,
+}));
+```
+
+**How reactivity works:** on every store dispatch, `mapStateToData` is called. Changed values are written into the component's Signal objects. Tinybubble's effect system re-renders only the DOM nodes that depend on those signals — no polling, no manual updates.
+
+**Per-instance selectors** for parametric lookups (e.g. finding one item by ID in a list):
+
+```javascript
+import { createSelectorFactory, createSelector } from 'bubble-store';
+
+// Define once
+export const makeItemByIdSelector = createSelectorFactory(() =>
+    createSelector(
+        state => state.cart.items,
+        (state, id) => id,
+        (items, id) => items.find(i => i.id === id) ?? null
+    )
+);
+
+// In the component — each instance gets its own memoization cache
+export default connectStore({
+    props: ['itemId'],
+    data() { return { item: null }; },
+    init() { this._select = makeItemByIdSelector(); },
+}, (state, component) => ({
+    item: component._select?.(state, component.props.itemId),
+}));
+```
+
+See the full working example: [`examples/store/pizzeria.html`](examples/store/pizzeria.html)
 
 ### Easy routing included
 
