@@ -9,7 +9,12 @@ function flushEffects() {
     const batch = [...pendingEffects];
     pendingEffects.clear();
     for (const fn of batch) {
-        if (!fn._disposed) fn();
+        if (!fn._disposed) {
+            const prev = current;
+            current = fn;
+            fn();
+            current = prev;
+        }
     }
 }
 

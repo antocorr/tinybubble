@@ -4,8 +4,15 @@ const blocks = {
   anatomy: {
     code: `export default {
   name: 'MyCard',
+  compId: 'my-card',            // de-dupe inline CSS
   props: ['title', 'subtitle'],   // declared props
   emits: ['select', 'close'],     // declared emits
+
+  style() {
+    return \`
+      .my-card { border-radius: 12px; }
+    \`
+  },
 
   data() {
     return { expanded: false }    // each key → Signal
@@ -163,6 +170,37 @@ export default {
 }`,
     lang: 'javascript',
   },
+  styles: {
+    code: `export default {
+  name: 'ProfileCard',
+  compId: 'profile-card',
+
+  // Inline CSS. Injected once per compId into document.head.
+  style() {
+    return \`
+      .profile-card {
+        border: 1px solid #ddd;
+        border-radius: 12px;
+        padding: 16px;
+      }
+    \`
+  },
+
+  // External CSS. Appended once per stable URL as a <link rel="stylesheet">.
+  styleURL: new URL('./ProfileCard.css', import.meta.url).href,
+
+  template() {
+    return \`
+      <article class="profile-card">
+        <h2>{{ name }}</h2>
+      </article>
+    \`
+  },
+
+  data() { return { name: 'Ken' } },
+}`,
+    lang: 'javascript', filename: 'components/ProfileCard.js',
+  },
   childComp: {
     code: `import Avatar from './Avatar.js'
 import Badge from './Badge.js'
@@ -272,6 +310,18 @@ export default {
 
         <h2>Lifecycle hooks</h2>
         <div data-code="lifecycle"></div>
+
+        <h2>style and styleURL</h2>
+        <p>
+          Use <code>style</code> for component CSS and <code>styleURL</code> for an external stylesheet.
+          Both are processed when the component is created and injected into <code>document.head</code>.
+        </p>
+        <div data-code="styles"></div>
+        <p>
+          Add a stable <code>compId</code> when using <code>style</code>, so TinyBubble does not inject
+          the same inline CSS more than once. For <code>styleURL</code>, use a stable URL string for shared CSS.
+          Use reactive <code>:class</code> or <code>:style</code> for state-dependent visual changes.
+        </p>
 
         <h2>Child components</h2>
         <p>Register sub-components in the <code>components</code> map. Key = lowercase hyphenated tag name.</p>

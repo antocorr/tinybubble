@@ -532,7 +532,6 @@ export function createComponent(original, data, _props, parent = null, emitListe
             $destroy: () => {}
         };
     }
-
     // 1. Handle initial Props
     let props = {};
     if (data && data.props) {
@@ -617,13 +616,18 @@ export function createComponent(original, data, _props, parent = null, emitListe
     // 8. Handle Scoped/Global CSS
     if (component.style && !styleTagsAdded.has(component.compId)) {
         let style = typeof component.style === "function" ? component.style() : component.style;
-        const styleTag = document.createElement('style');
-        styleTag.innerHTML = style;
+        const styleTag = html(`<style>${style}</style>`);
         document.head.appendChild(styleTag);
         if (component.compId) styleTagsAdded.add(component.compId);
     }
-
-    // 9. Init Lifecycle
+    // 9. Handle style links
+    if (component.styleURL && !styleTagsAdded.has(component.styleURL)) { 
+        const url = typeof component.styleURL === "function" ? component.styleURL() : component.styleURL;
+        const linkTag = html(`<link rel="stylesheet" href="${url}">`);
+        document.head.appendChild(linkTag);
+        styleTagsAdded.add(url);
+    }
+    // 10. Init Lifecycle
     if (component.init) component.init();
 
     return component;

@@ -61,6 +61,25 @@ export default {
 }`,
     lang: 'javascript',
   },
+  componentStyles: {
+    code: `export default {
+  name: 'ProfileCard',
+  compId: 'profile-card',
+
+  // String or function returning CSS.
+  style() {
+    return \`.profile-card { padding: 16px; }\`
+  },
+
+  // String or function returning a stylesheet URL.
+  styleURL: new URL('./ProfileCard.css', import.meta.url).href,
+
+  template() {
+    return \`<article class="profile-card">{{ name }}</article>\`
+  },
+}`,
+    lang: 'javascript',
+  },
   globals: {
     code: `import { globals } from 'tinybubble'
 
@@ -123,6 +142,25 @@ export default {
             <div class="px-5 py-4">
               <p class="text-sm text-gray-700 dark:text-gray-300 mb-4">Watches a specific prop for changes. Call from <code>init()</code>. Callback receives <code>(newValue, oldValue)</code>.</p>
               <div data-code="watchProp"></div>
+            </div>
+          </div>
+
+          <div class="rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+            <div class="px-5 py-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex flex-wrap items-baseline gap-2">
+              <code class="text-brand-700 dark:text-brand-300 font-mono font-semibold text-base">style / styleURL</code>
+              <code class="text-gray-500 font-mono text-sm">component definition options</code>
+            </div>
+            <div class="px-5 py-4">
+              <p class="text-sm text-gray-700 dark:text-gray-300 mb-4">
+                <code>style</code> injects inline CSS as a <code>&lt;style&gt;</code> tag.
+                <code>styleURL</code> appends a <code>&lt;link rel="stylesheet"&gt;</code> tag.
+                Both accept a string or a function and run when the component is created.
+              </p>
+              <p class="text-sm text-gray-700 dark:text-gray-300 mb-4">
+                Use a stable <code>compId</code> with <code>style</code> to avoid duplicate inline tags.
+                Use a stable URL for shared <code>styleURL</code> values. For reactive styling, use template bindings such as <code>:class</code> or <code>:style</code>.
+              </p>
+              <div data-code="componentStyles"></div>
             </div>
           </div>
 
