@@ -59,6 +59,11 @@ export default {
                class="px-6 py-3 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-semibold transition-colors shadow-lg shadow-brand-500/20">
               Get Started →
             </a>
+            <a href="#/examples"
+               class="px-6 py-3 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300
+                      hover:border-brand-400 hover:text-brand-600 dark:hover:text-brand-400 font-semibold transition-colors">
+              Examples
+            </a>
             <a href="https://github.com/antocorr/tinybubble" target="_blank" rel="noopener"
                class="px-6 py-3 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300
                       hover:border-brand-400 hover:text-brand-600 dark:hover:text-brand-400 font-semibold transition-colors">

@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RGB Color Studio — :value & @input</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.04) 1px, transparent 0);
+            background-size: 24px 24px;
+        }
+        input[type="range"]::-webkit-slider-thumb { appearance: none; width: 16px; height: 16px; border-radius: 50%; border: 2px solid #fff; cursor: pointer; }
+        input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #fff; cursor: pointer; }
+    </style>
+</head>
+<body class="min-h-screen bg-gray-950 flex items-center justify-center p-6">
+    <div id="app" class="w-full max-w-sm"></div>
+    <script src="components/color-studio.app.js" type="module" defer></script>
+    <script src="../show-code.js" data-files="components/color-studio.app.js,components/color-studio/ColorSlider.js"></script>
+</body>
+</html>

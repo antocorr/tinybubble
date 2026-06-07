@@ -14,6 +14,7 @@ import ApiSignalsPage      from './pages/api-signals.js'
 import ApiComponentsPage   from './pages/api-components.js'
 import ApiRouterPage       from './pages/api-router.js'
 import ApiEventsPage       from './pages/api-events.js'
+import ExamplesPage        from './pages/examples.js'
 import NotFoundPage        from './pages/not-found.js'
 
 export const router = createRouter({
@@ -34,6 +35,7 @@ export const router = createRouter({
     { path: '/api/components',         component: ApiComponentsPage },
     { path: '/api/router',             component: ApiRouterPage },
     { path: '/api/events',             component: ApiEventsPage },
+    { path: '/examples',               component: ExamplesPage },
     { path: '*',                       component: NotFoundPage },
   ],
 })

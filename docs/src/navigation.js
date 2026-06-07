@@ -31,6 +31,12 @@ export const nav = [
     ],
   },
   {
+    section: 'Examples',
+    items: [
+      { label: 'All examples', path: '/examples' },
+    ],
+  },
+  {
     section: 'API Reference',
     items: [
       { label: 'Signals API',          path: '/api/signals' },

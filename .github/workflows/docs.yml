@@ -42,8 +42,8 @@ jobs:
         working-directory: docs
 
       # Preserve existing examples/ so links in the README keep working
-      - name: Copy examples into build
-        run: cp -r examples docs/dist/examples
+      - name: Copy examples and src into build
+        run: cp -r examples docs/dist/examples && cp -r src docs/dist/src
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
