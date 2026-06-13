@@ -52,4 +52,22 @@ describe("signals", () => {
       [12, 11],
     ]);
   });
+
+  it("watch does not track signals read inside callback", async () => {
+    const source = Signal("a");
+    const local = Signal(0);
+    const changes = [];
+
+    watch(source, (value) => {
+      changes.push([value, local.value]);
+    });
+
+    source.value = "b";
+    await flushMicrotasks();
+
+    local.value = 1;
+    await flushMicrotasks();
+
+    expect(changes).toEqual([["b", 0]]);
+  });
 });

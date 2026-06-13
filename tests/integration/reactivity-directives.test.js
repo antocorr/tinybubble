@@ -3,6 +3,16 @@ import { createComponent } from "../../src/index.js";
 import { flushMicrotasks } from "../setup/test-helpers.js";
 
 describe("reactivity directives", () => {
+  it("throws a clear error when template has no root element", () => {
+    const App = {
+      template() {
+        return "";
+      },
+    };
+
+    expect(() => createComponent(App)).toThrow("TinyBubble template must return one root element");
+  });
+
   it("syncs x-model both ways", async () => {
     const App = {
       template() {
@@ -82,6 +92,72 @@ describe("reactivity directives", () => {
     expect(host.querySelector("#shown").style.display).toBe("none");
     expect(host.querySelector("#guarded").hasAttribute("disabled")).toBe(true);
     expect(host.querySelector("#state-class").className).toContain("muted");
+
+    app.$destroy();
+  });
+
+  it("x-hide hides when true and shows when false", async () => {
+    const App = {
+      template() {
+        return `
+          <div>
+            <button id="toggle" @click="toggle">Toggle</button>
+            <div id="hidden" x-hide="gone">Hidden block</div>
+          </div>
+        `;
+      },
+      data() {
+        return { gone: false };
+      },
+      toggle() {
+        this.data.gone.value = !this.data.gone.value;
+      },
+    };
+
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+
+    const app = createComponent(App);
+    app.appendTo(host);
+
+    expect(host.querySelector("#hidden").style.display).toBe("");
+
+    host.querySelector("#toggle").click();
+    await flushMicrotasks();
+
+    expect(host.querySelector("#hidden").style.display).toBe("none");
+
+    host.querySelector("#toggle").click();
+    await flushMicrotasks();
+
+    expect(host.querySelector("#hidden").style.display).toBe("");
+
+    app.$destroy();
+  });
+
+  it("interpolates multiple {{ }} expressions in the same text node", async () => {
+    const App = {
+      template() {
+        return `<div><p id="out">{{ greeting }}, {{ name }}! You have {{ count }} messages.</p></div>`;
+      },
+      data() {
+        return { greeting: "Hello", name: "Mario", count: 3 };
+      },
+    };
+
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+
+    const app = createComponent(App);
+    app.appendTo(host);
+
+    expect(host.querySelector("#out").textContent).toBe("Hello, Mario! You have 3 messages.");
+
+    app.data.name.value = "Luigi";
+    app.data.count.value = 5;
+    await flushMicrotasks();
+
+    expect(host.querySelector("#out").textContent).toBe("Hello, Luigi! You have 5 messages.");
 
     app.$destroy();
   });

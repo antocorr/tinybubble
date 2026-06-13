@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createComponent, createRouter } from "../../src/index.js";
+import { createComponent, createRouter, globals } from "../../src/index.js";
 import { flushMicrotasks, waitFor } from "../setup/test-helpers.js";
 
 function mountRouterApp(router) {
@@ -64,6 +64,26 @@ describe("router", () => {
     });
 
     expect(router.getDestination()).toBe("/user/42");
+  });
+
+  it("updates global route before RouterView is mounted", async () => {
+    window.location.hash = "#/user/7";
+
+    const User = {
+      template() {
+        return `<p>User</p>`;
+      },
+    };
+
+    createRouter({
+      mode: "hash",
+      routes: [{ path: "/user/:id", component: User }],
+    });
+
+    await flushMicrotasks();
+
+    expect(globals.$route.value.path).toBe("/user/7");
+    expect(globals.$route.value.params.id).toBe("7");
   });
 
   it("keeps persistent routes alive between navigations", async () => {

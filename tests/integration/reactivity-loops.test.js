@@ -73,4 +73,41 @@ describe("reactivity nested loops", () => {
     expect(cards).toHaveLength(5);
     expect(cards).toContain("Card 3");
   });
+
+  it("renders object values and keys with x-for", async () => {
+    const App = {
+      template() {
+        return `
+          <div>
+            <button id="add-category" @click="addCategory">Add category</button>
+            <p class="category" x-for="(category, key) in categories">{{ key }}: {{ category.label }}</p>
+          </div>
+        `;
+      },
+      data() {
+        return {
+          categories: {
+            adults: { label: "Adults" },
+          },
+        };
+      },
+      addCategory() {
+        this.data.categories.value.children = { label: "Children" };
+      },
+    };
+
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+
+    const app = createComponent(App);
+    app.appendTo(host);
+
+    expect(host.querySelector(".category").textContent).toContain("adults: Adults");
+
+    host.querySelector("#add-category").click();
+    await flushMicrotasks();
+
+    const categories = [...host.querySelectorAll(".category")].map((el) => el.textContent.trim());
+    expect(categories).toEqual(["adults: Adults", "children: Children"]);
+  });
 });

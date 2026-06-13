@@ -6,6 +6,7 @@ const allExports = `import {
   createSignal,
   effect,
   watch,
+  untrack,
   computed,
   tick,
   collectEffects,
@@ -58,12 +59,26 @@ stop()               // stops — no more updates`,
     code: `const query = Signal('')
 
 // NOT called on mount — only on subsequent changes
+// callback reads are untracked
 watch(query, (newVal, oldVal) => {
   fetchResults(newVal)
 })
 
 // Also accepts a getter
 watch(() => user.value.name, (name) => console.log(name))`,
+    lang: 'javascript',
+  },
+  untrack: {
+    code: `const count = Signal(0)
+const debug = Signal(false)
+
+effect(() => {
+  console.log(count.value)
+  untrack(() => debug.value)
+})
+
+debug.value = true  // no re-run
+count.value = 1     // re-runs`,
     lang: 'javascript',
   },
   computed: {
@@ -159,8 +174,19 @@ export default {
               <code class="text-gray-500 font-mono text-sm">(source, callback)</code>
             </div>
             <div class="px-5 py-4">
-              <p class="text-sm text-gray-700 dark:text-gray-300 mb-4">Like <code>effect</code> but lazy — callback fires only on subsequent changes, not on mount.</p>
+              <p class="text-sm text-gray-700 dark:text-gray-300 mb-4">Like <code>effect</code> but lazy — callback fires only on subsequent changes, not on mount. Signals read in the callback are not tracked as dependencies.</p>
               <div data-code="watch"></div>
+            </div>
+          </div>
+
+          <div class="rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+            <div class="px-5 py-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex flex-wrap items-baseline gap-2">
+              <code class="text-brand-700 dark:text-brand-300 font-mono font-semibold text-base">untrack</code>
+              <code class="text-gray-500 font-mono text-sm">(fn) → any</code>
+            </div>
+            <div class="px-5 py-4">
+              <p class="text-sm text-gray-700 dark:text-gray-300 mb-4">Runs <code>fn</code> without subscribing the current effect to signals read inside.</p>
+              <div data-code="untrack"></div>
             </div>
           </div>
 

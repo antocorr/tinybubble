@@ -74,12 +74,28 @@ stop()   // effect will never run again`,
 const query = Signal('')
 
 // callback NOT called on mount — only on subsequent changes
+// signals read inside the callback are not added as watch dependencies
 watch(query, (newVal, oldVal) => {
   console.log(\`search: "\${oldVal}" → "\${newVal}"\`)
   fetchResults(newVal)
 })
 
 query.value = 'hello'   // → logs and fetches`,
+    lang: 'javascript',
+  },
+  untrack: {
+    code: `import { Signal, effect, untrack } from 'tinybubble'
+
+const count = Signal(0)
+const debug = Signal(false)
+
+effect(() => {
+  console.log(count.value)
+  untrack(() => console.log('debug:', debug.value))
+})
+
+debug.value = true  // does not re-run the effect
+count.value = 1     // re-runs the effect`,
     lang: 'javascript',
   },
   computed: {
@@ -186,8 +202,12 @@ export default {
         <div data-code="effectDispose"></div>
 
         <h2>watch</h2>
-        <p>Like <code>effect</code> but <em>lazy</em> — the callback only fires on subsequent changes, not on first run.</p>
+        <p>Like <code>effect</code> but <em>lazy</em> — the callback only fires on subsequent changes, not on first run. Reads inside the callback are untracked, so <code>watch(source, cb)</code> stays subscribed to <code>source</code>.</p>
         <div data-code="watch"></div>
+
+        <h2>untrack</h2>
+        <p>Runs a function without subscribing the current reactive effect to any signals read inside.</p>
+        <div data-code="untrack"></div>
 
         <h2>computed</h2>
         <p>Creates a derived signal that recomputes whenever dependencies change.</p>

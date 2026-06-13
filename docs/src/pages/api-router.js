@@ -64,6 +64,7 @@ components: { 'router-view': router.RouterView }
   routeSignal: {
     code: `// Available everywhere after createRouter() is called
 // Shape: { path: '/user/42', params: { id: '42' }, query: { tab: 'posts' } }
+// Owned by createRouter(); do not assign globals.$route yourself.
 
 // In templates
 <p>Path: {{ $route.path }}</p>
@@ -94,7 +95,7 @@ export default {
               <code class="text-gray-500 font-mono text-sm">(options) → RouterInstance</code>
             </div>
             <div class="px-5 py-4">
-              <p class="text-sm text-gray-700 dark:text-gray-300 mb-4">Options: <code>mode</code>, <code>base</code>, <code>routes</code>, <code>srcBase</code>. Registers <code>globals.$route</code> automatically.</p>
+              <p class="text-sm text-gray-700 dark:text-gray-300 mb-4">Options: <code>mode</code>, <code>base</code>, <code>routes</code>, <code>srcBase</code>. Registers and updates <code>globals.$route</code> automatically.</p>
               <div data-code="createRouter"></div>
             </div>
           </div>
@@ -147,7 +148,7 @@ export default {
               <code class="text-gray-500 font-mono text-sm">SignalObject → { path, params, query }</code>
             </div>
             <div class="px-5 py-4">
-              <p class="text-sm text-gray-700 dark:text-gray-300 mb-4">Reactive signal set on globals when <code>createRouter</code> is called. Updated on every navigation.</p>
+              <p class="text-sm text-gray-700 dark:text-gray-300 mb-4">Reactive signal set on globals when <code>createRouter</code> is called. Updated on every navigation, even before <code>RouterView</code> mounts.</p>
               <div data-code="routeSignal"></div>
             </div>
           </div>

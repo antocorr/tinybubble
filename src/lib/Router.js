@@ -121,6 +121,24 @@ export function createRouter({ mode = 'history', base = '/', routes = [], srcBas
         return { params };
     }
 
+    function resolveRoute(current) {
+        for (const r of routes) {
+            const m = matchRoute(r.path, current);
+            if (m) return { match: r, params: m.params };
+        }
+        return { match: null, params: {} };
+    }
+
+    effect(() => {
+        const current = getDestination();
+        const resolved = resolveRoute(current);
+        routeSignal.value = {
+            path: current,
+            params: resolved.params,
+            query: Object.fromEntries(new URLSearchParams(window.location.search))
+        };
+    });
+
     const componentMemory = new Map();
     // component <RouterView/>
     function RouterView() {
@@ -130,19 +148,9 @@ export function createRouter({ mode = 'history', base = '/', routes = [], srcBas
 
         effect(async () => {
             const current = getDestination();
-
-            // Trova la rotta corrispondente
-            let match = null;
-            let params = {};
-
-            for (const r of routes) {
-                const m = matchRoute(r.path, current);
-                if (m) {
-                    match = r;
-                    params = m.params;
-                    break;
-                }
-            }
+            const resolved = resolveRoute(current);
+            const match = resolved.match;
+            const params = resolved.params;
 
             // Destroy previous component (skip persistent — it stays alive in memory)
             if (mountedComp && !mountedIsPersistent) mountedComp.$destroy();
@@ -160,13 +168,6 @@ export function createRouter({ mode = 'history', base = '/', routes = [], srcBas
                         return outlet;
                     }
                 }
-
-                // Aggiorna il signal globale (tutte le istanze si aggiornano automaticamente)
-                routeSignal.value = {
-                    path: current,
-                    params,
-                    query: Object.fromEntries(new URLSearchParams(window.location.search))
-                };
 
                 if (typeof match.component != "function" && match.component.template) {
                     let comp;

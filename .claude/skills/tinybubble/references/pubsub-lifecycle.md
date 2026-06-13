@@ -35,14 +35,16 @@ export default {
 ## Rule Set
 
 - Use `bubble.events.topic("name")`
-- Do not use `bubble.topic("name")`
 - Store handler references on `this`
 - Detach old handlers before re-registering in repeated init paths
 - Prefer structured payloads: `topic.emit("event", { ... })`
 - Avoid anonymous inline handlers for topic subscriptions
 
-## Common Pitfalls
+## Do / Don't
 
-- Mixed API usage in same file (`bubble.topic` and `bubble.events.topic`)
-- Re-init without detach, causing duplicated callbacks
-- Topic `.on(...)` calls with anonymous callbacks that cannot be detached
+| Do | Don't |
+|---|---|
+| `bubble.events.topic("cart")` | `bubble.topic("cart")` |
+| Store handler refs on `this` | Anonymous callbacks in `.on(...)` |
+| Detach in `beforeDestroy()` | Leave topic listeners registered after destroy |
+| `topic.emit("event", { id, value })` | positional payloads that are hard to evolve |

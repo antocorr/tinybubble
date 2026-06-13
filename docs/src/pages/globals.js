@@ -111,7 +111,7 @@ export default {
         <h2>Reactive globals (<code>$</code> prefix)</h2>
         <p>
           A key starting with <code>$</code> whose value is a <code>SignalObject</code> is exposed as
-          a reactive property on every component instance. This is how <code>$route</code> works.
+          a reactive property on every component instance. <code>createRouter()</code> uses this for <code>$route</code> and owns that global.
         </p>
         <div data-code="reactiveGlobals"></div>
 

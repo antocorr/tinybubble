@@ -9,7 +9,9 @@ import { evaluate } from "./Evaluate.js";
 export function html(markup) {
     const tp = document.createElement('template');
     tp.innerHTML = markup.trim();
-    return tp.content.firstElementChild;
+    const el = tp.content.firstElementChild;
+    if (!el) throw new Error("TinyBubble template must return one root element");
+    return el;
 }
 
 const styleTagsAdded = new Set();
@@ -30,22 +32,6 @@ function bubblify(str) {
     });
 }
 
-/**
- * Prepares {{ }} strings for replacement
- */
-function prepareForReplace(txt) {
-    const textArr = txt.split('{{');
-    const reactiveIndexes = new Set();
-    for (let i = 0; i < textArr.length; i++) {
-        if (textArr[i].includes('}}')) {
-            const parts = textArr[i].split('}}');
-            textArr[i] = parts[0];
-            textArr.splice(i + 1, 0, parts[1]);
-            reactiveIndexes.add(i);
-        }
-    }
-    return [textArr, reactiveIndexes];
-}
 
 
 // ============================================================
@@ -76,7 +62,7 @@ function caseSensitiveToHyphen(str) {
 function createProps(propKeys, incoming) {
     const _signals = {};
     for (const k in incoming) {
-        const definedKey = propKeys.find(pk => pk === k || caseSensitiveToHyphen(pk) === k || pk.toLowerCase() === k.toLowerCase()) || k;
+        const definedKey = propKeys.find(pk => caseSensitiveToHyphen(pk) === k || pk.toLowerCase() === k.toLowerCase()) || k;
         _signals[definedKey] = incoming[k] instanceof SignalObject ? incoming[k] : Signal(incoming[k]);
     }
     for (const k of propKeys) {
@@ -88,10 +74,7 @@ function createProps(propKeys, incoming) {
             const signal = target[key];
             return signal ? signal.value : undefined;
         },
-        set(_target, key) {
-            console.warn(`Props are readonly at top-level. Cannot set "${key}".`);
-            return false;
-        }
+        set() { return false; }
     });
 
     return { proxy, signals: _signals };
@@ -101,12 +84,7 @@ function createProps(propKeys, incoming) {
  * Watch a specific prop for changes
  */
 export function watchProp(component, key, callback) {
-    const signals = component._propsSignals;
-    if (!signals || !(key in signals)) {
-        console.warn(`watchProp: prop "${key}" not found in component.`);
-        return;
-    }
-    const signal = signals[key];
+    const signal = component._propsSignals && component._propsSignals[key];
     if (signal instanceof SignalObject) watch(signal, callback);
 }
 
@@ -140,6 +118,38 @@ function invokeExpr(expr, component, scope, args) {
     if (typeof res === 'function') res(...args);
 }
 
+/**
+ * Detach `el` (or its template content) from the DOM, leaving a comment
+ * anchor in its place. Shared preamble of x-for / x-if.
+ */
+function extractTemplate(el, attrName) {
+    const anchor = document.createComment(attrName);
+    el.parentNode.insertBefore(anchor, el);
+    const isTemplate = el.tagName === 'TEMPLATE';
+    const content = isTemplate ? el.content : el;
+    el.remove();
+    return { anchor, isTemplate, content, attrName };
+}
+
+/**
+ * Clone the extracted template, insert it before its anchor and bind it.
+ * Effect disposers are pushed into `disposers`; returns the inserted nodes.
+ */
+function insertClone(tpl, component, scope, bindNodeFn, disposers) {
+    const { anchor, isTemplate, content, attrName } = tpl;
+    const parent = anchor.parentNode;
+    const clone = content.cloneNode(true);
+    if (!isTemplate) clone.removeAttribute(attrName);
+    const inserted = [];
+    (isTemplate ? [...clone.childNodes] : [clone]).forEach(child => {
+        parent.insertBefore(child, anchor);
+        disposers.push(...collectEffects(() => bindNodeFn(child, component, scope)));
+        const tracked = trackNode(child, anchor, parent);
+        if (tracked && !inserted.includes(tracked)) inserted.push(tracked);
+    });
+    return inserted;
+}
+
 export function handleFor(el, component, localScope, bindNodeFn) {
     if (!el.hasAttribute('x-for')) return false;
 
@@ -155,13 +165,7 @@ export function handleFor(el, component, localScope, bindNodeFn) {
         if (idxName) indexKey = idxName;
     }
 
-    const anchor = document.createTextNode('');
-    const parent = el.parentNode;
-    parent.insertBefore(anchor, el);
-
-    const isTemplate = el.tagName === 'TEMPLATE';
-    const templateContent = isTemplate ? el.content : el;
-    el.remove();
+    const tpl = extractTemplate(el, 'x-for');
 
     let renderedItems = [];
     let childDisposers = [];
@@ -178,24 +182,18 @@ export function handleFor(el, component, localScope, bindNodeFn) {
 
         if (Array.isArray(list)) {
             list.forEach((itemData, idx) => {
-                const clone = templateContent.cloneNode(true);
-                if (!isTemplate) clone.removeAttribute('x-for');
-                const nodesToInsert = isTemplate ? [...clone.childNodes] : [clone];
-
-                nodesToInsert.forEach(child => {
-                    const scoped = indexKey
-                        ? { ...localScope, [itemKey]: itemData, [indexKey]: idx }
-                        : { ...localScope, [itemKey]: itemData };
-                    child._$localScope = scoped;
-                    parent.insertBefore(child, anchor);
-                    if (bindNodeFn) {
-                        const disposers = collectEffects(() => bindNodeFn(child, component, scoped));
-                        childDisposers.push(...disposers);
-                    }
-                    const tracked = trackNode(child, anchor, parent);
-                    if (tracked && !renderedItems.includes(tracked)) renderedItems.push(tracked);
-                });
+                const scoped = indexKey
+                    ? { ...localScope, [itemKey]: itemData, [indexKey]: idx }
+                    : { ...localScope, [itemKey]: itemData };
+                renderedItems.push(...insertClone(tpl, component, scoped, bindNodeFn, childDisposers));
             });
+        } else if (list && typeof list === "object") {
+            for (const key in list) {
+                const scoped = indexKey
+                    ? { ...localScope, [itemKey]: list[key], [indexKey]: key }
+                    : { ...localScope, [itemKey]: list[key] };
+                renderedItems.push(...insertClone(tpl, component, scoped, bindNodeFn, childDisposers));
+            }
         }
     });
 
@@ -203,62 +201,37 @@ export function handleFor(el, component, localScope, bindNodeFn) {
 }
 
 function handleIf(el, component, localScope, bindNodeFn) {
-    if (!el.getAttribute('x-if')) return false;
-
     const expr = el.getAttribute('x-if');
-    const anchor = document.createComment('x-if-anchor');
-    el.parentNode.insertBefore(anchor, el);
+    if (!expr) return false;
 
-    const isTemplate = el.tagName === 'TEMPLATE';
-    const templateContent = isTemplate ? el.content : el;
-    el.remove();
+    const tpl = extractTemplate(el, 'x-if');
 
-    let renderedNode = null;
+    let renderedNodes = null;
     let childDisposers = [];
 
     effect(() => {
-        const currentScope = buildScope(component, localScope);
-        const result = evaluate(expr, currentScope, component);
+        const result = evaluate(expr, buildScope(component, localScope), component);
 
-        if (result) {
-            if (!renderedNode) {
-                const clone = templateContent.cloneNode(true);
-                if (!isTemplate) clone.removeAttribute('x-if');
-                const nodesToInsert = isTemplate ? [...clone.childNodes] : [clone];
-
-                const inserted = [];
-                nodesToInsert.forEach(child => {
-                    anchor.parentNode.insertBefore(child, anchor);
-                    const disposers = collectEffects(() => bindNodeFn(child, component, localScope));
-                    childDisposers.push(...disposers);
-                    const tracked = trackNode(child, anchor, anchor.parentNode);
-                    if (tracked && !inserted.includes(tracked)) inserted.push(tracked);
-                });
-                renderedNode = inserted;
-            }
-        } else {
-            if (renderedNode) {
-                childDisposers.forEach(d => d());
-                childDisposers = [];
-                renderedNode.forEach(n => n.remove());
-                renderedNode = null;
-            }
+        if (result && !renderedNodes) {
+            renderedNodes = insertClone(tpl, component, localScope, bindNodeFn, childDisposers);
+        } else if (!result && renderedNodes) {
+            childDisposers.forEach(d => d());
+            childDisposers = [];
+            renderedNodes.forEach(n => n.remove());
+            renderedNodes = null;
         }
     });
     return true;
 }
 
 function handleShowHide(el, component, localScope) {
-    if (el.hasAttribute('x-show') || el.hasAttribute('x-hide')) {
-        const isShow = el.hasAttribute('x-show');
-        const expr = el.getAttribute(isShow ? 'x-show' : 'x-hide');
-        effect(() => {
-            const currentScope = buildScope(component, localScope);
-            let res = evaluate(expr, currentScope, component);
-            if (!isShow) res = !res;
-            el.style.display = res ? '' : 'none';
-        });
-    }
+    const isShow = el.hasAttribute('x-show');
+    if (!isShow && !el.hasAttribute('x-hide')) return;
+    const expr = el.getAttribute(isShow ? 'x-show' : 'x-hide');
+    effect(() => {
+        let res = evaluate(expr, buildScope(component, localScope), component);
+        el.style.display = (isShow ? res : !res) ? '' : 'none';
+    });
 }
 
 function handleRefs(el, component) {
@@ -267,27 +240,33 @@ function handleRefs(el, component) {
     }
 }
 
+/**
+ * Bind a native DOM event to an expression. Supports the `-prevent` suffix;
+ * input/change handlers receive (value, oldValue, event) instead of (event).
+ */
+function attachEvent(el, eventName, expr, component, localScope) {
+    let oldVal = el.value || undefined;
+    let prevent = false;
+    if (eventName.includes('-prevent')) {
+        prevent = true;
+        eventName = eventName.replace('-prevent', '').trim();
+    }
+    el.addEventListener(eventName, (event) => {
+        if (prevent) event.preventDefault();
+        const scope = { ...buildScope(component, localScope), $event: event };
+        if (['input', 'change'].includes(eventName)) {
+            invokeExpr(expr, component, scope, [event.target.value, oldVal, event]);
+            oldVal = event.target.value;
+        } else {
+            invokeExpr(expr, component, scope, [event]);
+        }
+    });
+}
+
 function handleEvents(el, component, localScope) {
     [...el.attributes].forEach(attr => {
         if (attr.name.startsWith('-x-on:')) {
-            let eventName = attr.name.replace('-x-on:', '');
-            const expr = attr.value;
-            let oldVal = el.value || undefined;
-            let prevent = false;
-            if (eventName.includes('-prevent')) {
-                prevent = true;
-                eventName = eventName.replace('-prevent', '').trim();
-            }
-            el.addEventListener(eventName, (event) => {
-                if (prevent) event.preventDefault();
-                const scope = { ...buildScope(component, localScope), $event: event };
-                if (['input', 'change'].includes(eventName)) {
-                    invokeExpr(expr, component, scope, [event.target.value, oldVal, event]);
-                    oldVal = event.target.value;
-                } else {
-                    invokeExpr(expr, component, scope, [event]);
-                }
-            });
+            attachEvent(el, attr.name.replace('-x-on:', ''), attr.value, component, localScope);
         }
     });
 }
@@ -303,7 +282,7 @@ function handleModel(el, component, localScope) {
     const targetExpr = parts.join('.') || expr;
 
     el.addEventListener('input', () => {
-        const target = targetExpr ? evaluate(targetExpr, scope, component, returnSignal) : scope;
+        const target = evaluate(targetExpr, scope, component, returnSignal);
         if (target instanceof SignalObject) {
             target.value = el.value;
         } else {
@@ -346,9 +325,10 @@ function handleCustomComponent(el, component, localScope) {
                 }
             } else if (attr.name.startsWith('-x-on:')) {
                 const eventName = attr.name.replace('-x-on:', '');
-                if (componentEmits.includes(eventName)) {
-                    if (!emitListeners[eventName]) emitListeners[eventName] = [];
-                    emitListeners[eventName].push((...args) => {
+                const definedEvent = componentEmits.find(e => caseSensitiveToHyphen(e) === eventName || e.toLowerCase() === eventName.toLowerCase());
+                if (definedEvent) {
+                    if (!emitListeners[definedEvent]) emitListeners[definedEvent] = [];
+                    emitListeners[definedEvent].push((...args) => {
                         const scope = {
                             ...buildScope(component, localScope),
                             $event: args[0],
@@ -369,14 +349,7 @@ function handleCustomComponent(el, component, localScope) {
         const childComp = createComponent(compDef, undefined, childProps, component, emitListeners);
         registerDispose(() => childComp.$destroy());
         nativeEventBindings.forEach(({ eventName, expr }) => {
-            childComp.$element.addEventListener(eventName, (event) => {
-                const scope = { ...buildScope(component, localScope), $event: event };
-                if (['input', 'change'].includes(eventName)) {
-                    invokeExpr(expr, component, scope, [event.target.value]);
-                } else {
-                    invokeExpr(expr, component, scope, [event]);
-                }
-            });
+            attachEvent(childComp.$element, eventName, expr, component, localScope);
         });
         el.replaceWith(childComp.$element);
 
@@ -390,23 +363,15 @@ function handleCustomComponent(el, component, localScope) {
 }
 
 function handleTextNode(el, component, localScope) {
-    if (el.textContent.includes('{{')) {
-        const [textArr, reactiveIndexes] = prepareForReplace(el.textContent);
-
-        effect(() => {
-            const currentScope = buildScope(component, localScope);
-            let newText = '';
-            for (let i = 0; i < textArr.length; i++) {
-                if (reactiveIndexes.has(i)) {
-                    const val = evaluate(textArr[i].trim(), currentScope, component);
-                    newText += (val !== undefined && val !== null) ? val : '';
-                } else {
-                    newText += textArr[i];
-                }
-            }
-            el.textContent = newText;
+    if (!el.textContent.includes('{{')) return;
+    const template = el.textContent;
+    effect(() => {
+        const scope = buildScope(component, localScope);
+        el.textContent = template.replace(/\{\{(.+?)\}\}/g, (_, expr) => {
+            const val = evaluate(expr.trim(), scope, component);
+            return val !== undefined && val !== null ? val : '';
         });
-    }
+    });
 }
 
 // ============================================================
@@ -592,7 +557,7 @@ export function createComponent(original, data, _props, parent = null, emitListe
     let tp = component.setTemplate ? component.setTemplate : component.template;
     if (typeof tp === "function") tp = tp.apply(component);
 
-    if (tp) {
+    if (tp !== undefined && tp !== null) {
         component.$element = html(bubblify(tp));
     }
 
@@ -639,13 +604,7 @@ export function createComponent(original, data, _props, parent = null, emitListe
 const componentCache = {};
 
 function resolveSrc(src) {
-    const isAbsolute = /^(?:[a-z]+:)?\/\//i.test(src);
-    if (isAbsolute) return src;
-    try {
-        return new URL(src).href;
-    } catch (e) {
-        return src;
-    }
+    try { return new URL(src).href; } catch { return src; }
 }
 
 export async function importComponent(src, data, _props, parent = null, emitListeners = {}) {
@@ -662,7 +621,7 @@ export async function importComponent(src, data, _props, parent = null, emitList
             comp = createComponent(compDefinition, data, _props, parent, emitListeners);
         }
     } catch (e) {
-        console.warn("Error importing component!");
+        console.error(e);
     }
     return comp;
 }

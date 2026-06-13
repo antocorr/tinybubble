@@ -118,7 +118,7 @@ export default {
               <code class="text-gray-500 font-mono text-sm">(markupString) → HTMLElement</code>
             </div>
             <div class="px-5 py-4">
-              <p class="text-sm text-gray-700 dark:text-gray-300 mb-4">Parses an HTML string via a <code>&lt;template&gt;</code> tag and returns the first child element.</p>
+              <p class="text-sm text-gray-700 dark:text-gray-300 mb-4">Parses an HTML string via a <code>&lt;template&gt;</code> tag and returns the first child element. Throws <code>TinyBubble template must return one root element</code> when the markup is empty.</p>
               <div data-code="html"></div>
             </div>
           </div>

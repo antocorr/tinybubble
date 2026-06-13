@@ -15,7 +15,7 @@ Apply when the request involves:
 - New TinyBubble component/page creation or refactor (`.bub.js`, `.bubble.js`, any component file)
 - Signal/effect/computed/watch usage
 - Child component registration with props/emits
-- Fixing `this.props.foo.value` and template binding mistakes
+- Fixing props and template binding mistakes
 - Event topic wiring, listener cleanup, or pub-sub refactor
 - JobManager usage
 - TinyBubble router setup or route updates
@@ -128,13 +128,18 @@ Rules:
 | `x-model="obj.field"` | Two-way nested binding |
 | `x-for="item in items"` | Loop |
 | `x-for="(item, index) in items"` | Loop with index |
+| `x-for="(value, key) in object"` | Object loop with key |
 | `ref="name"` | DOM ref → `this.refs.name` |
 
 **Critical caveats:**
-- `attr="{{signal}}"` does NOT create reactive attributes — always use `:attr="expr"`
-- In templates use `{{ foo }}`, not `{{ props.foo }}`
+- Use `:attr="expr"` for reactive attributes
+- In templates, read props and state directly by name, such as `{{ foo }}`
+- Template bindings run later in the component scope. Local variables declared inside `template()` are not available to `{{ }}` or directive expressions; use `data`, `props`, methods, globals, or `x-for` locals.
+- JavaScript getters are not template methods. Prefer methods such as `vendorKey()` when template code must call derived logic.
 - `class` and `style` accumulate: static base is preserved, `:class`/`:style` appends on re-render
 - For `@input` and `@change`, bare handlers receive `(newValue, oldValue)` — use `$event` for the DOM event
+- `x-model` must point to a writable signal name or object path, not a function call result
+- `x-show` and `x-hide` only toggle display; child components still mount and run lifecycle hooks
 - **`{{ }}` in prose HTML:** if a template contains `{{ }}` as literal display text (not a binding), TinyBubble will try to evaluate it. Use `{<wbr>{ expr }<wbr>}` to break the pattern without changing visual output
 - Use `<template x-if="...">` to conditionally render multiple sibling elements without a wrapper div
 
@@ -143,7 +148,7 @@ Rules:
 ## 4. Signals API
 
 ```js
-import { Signal, createSignal, effect, watch, computed, tick, collectEffects } from 'tinybubble'
+import { Signal, createSignal, effect, watch, computed, tick, collectEffects, untrack } from 'tinybubble'
 
 const count = Signal(0)                          // SignalObject
 count.value = 1                                  // write
@@ -151,8 +156,10 @@ count.value                                      // read
 
 const [get, set] = createSignal(0)               // getter/setter tuple
 effect(() => { el.textContent = count.value })   // auto-tracks, re-runs on change
-watch(count, (next, prev) => fetchData(next))    // lazy — skips first run
+watch(count, (next, prev) => fetchData(next))    // lazy — skips first run; callback reads are untracked
 const double = computed(() => count.value * 2)  // derived signal
+
+untrack(() => count.value)                       // read without subscribing current effect
 
 tick()                                           // flush pending effects synchronously (useful in tests)
 
@@ -201,10 +208,11 @@ Parent wiring:
 ```
 
 Rules:
-- `this.props.foo` is already unwrapped — **never** `this.props.foo.value`
-- In template use `{{ foo }}` — **never** `{{ props.foo }}`
+- `this.props.foo` is already unwrapped
+- In templates, read props directly by name, such as `{{ foo }}`
 - Declare every emitted event in `emits`
-- Listener name must match exactly (case-sensitive)
+- Prefer kebab-case listeners for camelCase emits: `emits: ["reservationUpdate"]` pairs with `@reservation-update="handler"`
+- Listener matching normalizes camelCase/kebab-case the same way props do
 - Passing `:prop="sigName"` where `sigName` is a SignalObject passes the signal itself — child updates reactively
 
 To react to prop changes:
@@ -283,7 +291,7 @@ components: {
 <router-view></router-view>
 ```
 
-`$route` is a reactive global set by `createRouter`:
+`$route` is a reactive global owned and updated by `createRouter`:
 ```js
 {{ $route.path }}        // current path — reactive in any template
 {{ $route.params.id }}   // dynamic param
@@ -291,6 +299,8 @@ components: {
 ```
 
 **Caveats:**
+- Do not assign `globals.$route = router.route`; `router.route` is not part of the API
+- `$route` updates when the router destination changes, even before `RouterView` mounts
 - Register `router-link` and `router-view` in the `components` map of every component that uses them
 - `persistent: true` keeps the component alive in memory when navigating away
 - Programmatic navigation: `router.navigate("/path")`
@@ -335,7 +345,7 @@ bubble.state.user = { id: 42 }
 ```
 
 Rules:
-- API is `bubble.events.topic("name")` — never `bubble.topic("name")`
+- Topic API is `bubble.events.topic("name")`
 - Store handler refs on `this` — anonymous callbacks cannot be removed with `.off()`
 - Detach before re-register in repeated `init()` paths (prevents duplicate callbacks)
 - Prefer structured payloads: `topic.emit("event", { ... })`
@@ -422,30 +432,44 @@ Guidelines:
 
 ---
 
-## Migration Checklist
+## Current Usage Checklist
 
-| Old | New |
+- Read props as `this.props.foo` in JS and `{{ foo }}` in templates
+- Use `bubble.events.topic("x")` for pub/sub topics
+- Use reactive attributes such as `:src="imageUrl"`
+- Make every `template()` return one root element
+- Use `data`, `props`, methods, globals, or `x-for` locals in template bindings
+- Listen to camelCase emits with kebab-case HTML listeners, such as `@reservation-update` for `emit("reservationUpdate")`
+- Call `watchProp()` from `init()`
+- Use static `import` plus `component:` for Vite route builds
+
+## Do / Don't
+
+| Do | Don't |
 |---|---|
-| `this.props.foo.value` | `this.props.foo` |
-| `{{ props.foo }}` | `{{ foo }}` |
-| `bubble.topic("x")` | `bubble.events.topic("x")` |
-| `src="{{imageUrl}}"` | `:src="imageUrl"` |
-| `watchProp` in `mounted()` | `watchProp` in `init()` |
-| `src:` routes in Vite builds | static `import` + `component:` |
+| `this.props.foo` | `this.props.foo.value` |
+| `{{ foo }}` | `{{ props.foo }}` |
+| `:src="imageUrl"` | `src="{{ imageUrl }}"` |
+| `bubble.events.topic("cart")` | `bubble.topic("cart")` |
+| `return /*html*/"<div></div>"` from `template()` | `return ""` from `template()` |
+| `@reservation-update="handler"` for `emit("reservationUpdate")` | `@reservationUpdate="handler"` in HTML |
+| `watchProp(this, "userId", cb)` inside `init()` | registering prop watchers in `mounted()` |
+| `x-model="form.email"` | `x-model="getEmail()"` |
 
 ---
 
 ## Quality Gate
 
 Before finalizing TinyBubble-related edits:
-- [ ] No `this.props.*.value` remains
-- [ ] No mustache inside HTML attributes (`attr="{{...}}"`)
+- [ ] Props are read through unwrapped `this.props.foo` in JS and `{{ foo }}` in templates
+- [ ] Reactive attributes use `:attr="expr"`
 - [ ] Static `class`/`style` base preserved when using `:class`/`:style`
-- [ ] No mixed topic APIs (`bubble.topic` vs `bubble.events.topic`)
+- [ ] Pub/sub uses `bubble.events.topic("name")`
 - [ ] Topic listeners use stable handler refs and detach in `beforeDestroy`
 - [ ] `router-link` and `router-view` registered in `components` map where used
 - [ ] `globals.t` initialized once via bubble-translate bootstrap when i18n required
-- [ ] Emits names match child declaration and parent listeners exactly
+- [ ] Emits are declared and parent listeners use supported same-name or kebab-case mapping
+- [ ] `template()` returns one root element, never an empty string
 - [ ] `bubble` imported from `tinybubble/events` (not from core bundle)
 - [ ] Vite builds use static imports for routes (not `src:`)
 
@@ -457,6 +481,7 @@ Before finalizing TinyBubble-related edits:
 |---|---|
 | New component/page scaffold | `references/components-core.md` |
 | Child props not updating / wrong value shape | `references/props-emits.md` |
+| Camel emit not received from parent listener | `references/props-emits.md` |
 | Cross-component communication without prop drilling | `references/pubsub-lifecycle.md` |
 | Duplicate pub-sub callbacks after re-init | `references/pubsub-lifecycle.md` |
 | Progress tracking for async batches | `references/pubsub-lifecycle.md` (JobManager section) |

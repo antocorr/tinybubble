@@ -59,6 +59,7 @@ createRouter({ mode: 'history', routes })`,
   routeSignal: {
     code: `// $route is available in any template after createRouter() is called
 // Shape: { path: '/user/42', params: { id: '42' }, query: { tab: 'posts' } }
+// createRouter owns and updates globals.$route.
 
 // In a template
 <p>User ID: {{ $route.params.id }}</p>
@@ -157,7 +158,7 @@ export default {
         <div data-code="modes"></div>
 
         <h2>The <code>$route</code> signal</h2>
-        <p>After <code>createRouter()</code> is called, <code>$route</code> is available globally in all templates and updates on every navigation.</p>
+        <p>After <code>createRouter()</code> is called, <code>$route</code> is available globally in all templates and updates on every navigation, even before <code>router-view</code> mounts.</p>
         <div data-code="routeSignal"></div>
 
         <h2>Programmatic navigation</h2>

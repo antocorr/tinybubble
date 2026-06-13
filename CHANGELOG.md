@@ -2,6 +2,24 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.2.0] - 2026-06-13
+
+### Added
+- Added `untrack()` to read signals without subscribing the current reactive effect.
+- Added object support to `x-for`, including `(value, key) in object` loops.
+- Added focused regression tests for router globals, watch callback tracking, empty templates, camelCase emits, and object loops.
+
+### Changed
+- Updated `watch()` so callback reads do not become dependencies of the watched source.
+- Updated `createRouter()` so `globals.$route` is owned and updated by the router even before `RouterView` mounts.
+- Updated component emit listener matching so kebab-case listeners can handle camelCase declared emits.
+
+### Fixed
+- Empty templates now fail with `TinyBubble template must return one root element` instead of surfacing a low-level DOM append error.
+
+### Docs
+- Updated the TinyBubble skill guidance for router globals, untracked watch callbacks, object loops, template scope limits, writable `x-model` targets, `x-show` lifecycle behavior, and emit listener naming.
+
 ## [1.0.2] - 2026-03-07
 
 ### Added

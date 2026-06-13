@@ -129,21 +129,40 @@ export default {
   template() {
     return \`
       <div>
-        <button @click="this.data.show.value = true">Delete</button>
+        <button @click="openConfirm">Delete</button>
         <confirm-dialog
           x-if="show"
           message="Are you sure?"
           @confirm="onConfirm"
-          @cancel="this.data.show.value = false"
+          @cancel="closeConfirm"
         />
       </div>
     \`
   },
-  onConfirm() {
+  openConfirm() {
+    this.data.show.value = true
+  },
+  closeConfirm() {
     this.data.show.value = false
+  },
+  onConfirm() {
+    this.closeConfirm()
     doDelete()
   },
 }`,
+    lang: 'javascript',
+  },
+  emitsCamel: {
+    code: `// Child declares and emits camelCase
+export default {
+  emits: ['reservationUpdate'],
+  save() {
+    this.emit('reservationUpdate', { status: 'saved' })
+  },
+}
+
+<!-- Parent listens with kebab-case -->
+<reservation-card @reservation-update="handleReservationUpdate"></reservation-card>`,
     lang: 'javascript',
   },
   lifecycle: {
@@ -276,6 +295,7 @@ export default {
           A TinyBubble component is a plain JavaScript object — no class syntax, no decorators.
           Just data, methods, and a template string.
         </p>
+        <blockquote>Each <code>template()</code> must return one root element. Empty templates throw <code>TinyBubble template must return one root element</code>.</blockquote>
 
         <h2>Anatomy</h2>
         <div data-code="anatomy"></div>
@@ -305,8 +325,9 @@ export default {
         <h2>emit — component events</h2>
         <p>Declare emittable events in <code>emits</code> and fire them with <code>this.emit(name, ...args)</code>.</p>
         <div data-code="emitsChild"></div>
-        <p>Parent listens with <code>@eventName</code> on the component tag:</p>
+        <p>Parent listens on the component tag. For camelCase emits, prefer kebab-case listeners in HTML.</p>
         <div data-code="emitsParent"></div>
+        <div data-code="emitsCamel"></div>
 
         <h2>Lifecycle hooks</h2>
         <div data-code="lifecycle"></div>

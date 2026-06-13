@@ -46,8 +46,8 @@ const blocks = {
     code: `<!-- Call a method (shorthand for method reference) -->
 <button @click="increment">+1</button>
 
-<!-- Inline expression -->
-<button @click="this.data.count.value++">+1</button>
+<!-- Prefer methods for state writes -->
+<button @click="nextStep">Next</button>
 
 <!-- Pass arguments -->
 <button @click="remove(item)">Delete</button>
@@ -73,7 +73,10 @@ data() {
     username: '',
     form: { email: '', password: '' }
   }
-}`,
+}
+
+// x-model target must be writable:
+// use x-model="form.email", not x-model="getEmail()"`,
     lang: 'javascript',
   },
   xif: {
@@ -91,7 +94,9 @@ data() {
 <div x-show="menuOpen" class="dropdown">...</div>
 
 <!-- x-hide is the inverse -->
-<span x-hide="isLoading">Ready</span>`,
+<span x-hide="isLoading">Ready</span>
+
+<!-- Child components inside x-show still mount and run lifecycle hooks -->`,
     lang: 'html',
   },
   xfor: {
@@ -101,6 +106,11 @@ data() {
 
 <!-- With index: (item, index) — note parentheses -->
 <li x-for="(todo, i) in todos">{{ i + 1 }}. {{ todo.text }}</li>
+
+<!-- Objects: (value, key) -->
+<li x-for="(category, key) in categories">
+  {{ key }}: {{ category.label }}
+</li>
 
 <!-- Multiple siblings per iteration -->
 <template x-for="p in products">
@@ -134,6 +144,22 @@ mounted() {
 }`,
     lang: 'javascript',
   },
+  templateScope: {
+    code: `template() {
+  const title = this.data.title.value
+  return \`<h1>{{ title }}</h1>\`  // wrong: local variable is gone later
+}
+
+// Use data directly or a method:
+template() {
+  return \`<h1>{{ pageTitle() }}</h1>\`
+}
+
+pageTitle() {
+  return this.data.title.value
+}`,
+    lang: 'javascript',
+  },
 }
 
 export default {
@@ -146,7 +172,13 @@ export default {
         <p class="lead">
           TinyBubble uses a Vue-inspired template syntax. Templates are plain HTML strings —
           the engine walks the DOM tree and attaches reactive effects for every binding it finds.
+          Each template must return one root element.
         </p>
+
+        <blockquote>
+          Template bindings run after <code>template()</code> returns. They can read component <code>data</code>, <code>props</code>, methods, globals, and <code>x-for</code> locals, but not local variables declared inside <code>template()</code>.
+        </blockquote>
+        <div data-code="templateScope"></div>
 
         <h2>Text interpolation — <code>{<wbr>{ }<wbr>}</code></h2>
         <p>Double curly braces evaluate a JS expression as text. Updates automatically when signals change.</p>
@@ -176,7 +208,7 @@ export default {
         <div data-code="events"></div>
 
         <h2>Two-way binding — <code>x-model</code></h2>
-        <p>Binds an input's value to a signal, syncing both ways.</p>
+        <p>Binds an input's value to a writable signal name or object path, syncing both ways.</p>
         <div data-code="xmodel"></div>
 
         <h2>Conditional rendering — <code>x-if</code></h2>
@@ -184,10 +216,11 @@ export default {
         <div data-code="xif"></div>
 
         <h2>Show / Hide — <code>x-show</code> / <code>x-hide</code></h2>
-        <p>Toggles <code>display:none</code> without removing from DOM. Prefer over <code>x-if</code> for cheap toggles.</p>
+        <p>Toggles <code>display:none</code> without removing from DOM. Prefer over <code>x-if</code> for cheap toggles. Use <code>x-if</code> when a child component must not mount until data is ready.</p>
         <div data-code="xshow"></div>
 
         <h2>List rendering — <code>x-for</code></h2>
+        <p>Loops over arrays and plain objects. With objects, <code>(value, key)</code> exposes the property value and key.</p>
         <div data-code="xfor"></div>
 
         <h3>Reactive list updates</h3>

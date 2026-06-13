@@ -71,4 +71,47 @@ describe("components props and emits", () => {
 
     expect(host.querySelector("#picked").textContent).toContain("2");
   });
+
+  it("matches kebab listeners to camelCase emits", async () => {
+    const ChildBox = {
+      emits: ["reservationUpdate"],
+      template() {
+        return `<button id="send-update" @click="notify">Emit</button>`;
+      },
+      notify() {
+        this.emit("reservationUpdate", "updated");
+      },
+    };
+
+    const App = {
+      components: {
+        "child-box": ChildBox,
+      },
+      template() {
+        return `
+          <div>
+            <child-box @reservation-update="onReservationUpdate"></child-box>
+            <p id="status">{{ status }}</p>
+          </div>
+        `;
+      },
+      data() {
+        return { status: "idle" };
+      },
+      onReservationUpdate(value) {
+        this.data.status.value = value;
+      },
+    };
+
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+
+    const app = createComponent(App);
+    app.appendTo(host);
+
+    host.querySelector("#send-update").click();
+    await flushMicrotasks();
+
+    expect(host.querySelector("#status").textContent).toContain("updated");
+  });
 });

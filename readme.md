@@ -1,14 +1,15 @@
 # TinyBubble — micro reactive UI library
-A modular reactive vanilla JavaScript UI library based on Signals and pub/sub.
+
+A modular reactive vanilla JavaScript UI library based on Signals, templates, routing, and optional pub/sub.
 
 | Bundle | Includes | Gzipped |
 |---|---|---|
-| `bubble.js` | Signals, reactivity engine, router | **~5 kb** |
-| `bubble-events.js` | Pub/sub, EventTopic, JobManager | **+1 kb** |
-| `bubble-full.js` | Everything | **~6 kb** |
+| `tinybubble` / `dist/bubble.js` | Signals, reactivity engine, router | **~5 kb** |
+| `tinybubble/events` / `dist/bubble-events.js` | Pub/sub, EventTopic, JobManager | **+1 kb** |
+| `tinybubble/full` / `dist/bubble-full.js` | Everything | **~6 kb** |
 
 ## Import the library
-### As a ES-6 module (recommended) from CDN
+### As an ES module from CDN
 ```javascript
 import { createComponent } from "https://cdn.jsdelivr.net/npm/tinybubble/dist/bubble.js"
 ```
@@ -20,7 +21,7 @@ npm i tinybubble
 ```
 ## AI FRIENDLY
 
-Being small and relatively simple (the minified version is just 4k tokens) and by pairing it with tailwind you can create all sort of components usin any LLM.
+Being small and relatively simple, and by pairing it with Tailwind, you can create all sorts of components using any LLM.
 
 TinyBubble is especially AI-friendly because the whole core mental model (templating directives, signals-based reactivity, and router) is clear and small, so an LLM can keep almost the entire framework behavior in context while generating or refactoring components.
 
@@ -28,12 +29,12 @@ There is also a prompt ready to use here
 
 https://github.com/antocorr/tinybubble/blob/main/ai-component-creation-prompt.md
 
-And the agents/claude skill ready to use.
+And the agents/Claude skill is ready to use.
 
-https://github.com/antocorr/tinybubble/tree/main/.claude/skills/bubble-components-pubsub-plugins
+https://github.com/antocorr/tinybubble/tree/main/.claude/skills/tinybubble
 
 
-And this a test made using GPT 5.1 using the creation-prompt
+This is a test made using GPT 5.1 with the creation prompt:
 
 https://antocorr.github.io/tinybubble/examples/ai-bakery.html
 
@@ -52,14 +53,14 @@ export default {
             <div>
                 <div>{{ character }}</div>
                 <div class="counter mt-4">
-                    <p>Count: {{counter}}</p>
-                    <button class="bg-blue-500 text-white p-2" @click="this.increment()">Increment</button>
+                    <p>Count: {{ counter }}</p>
+                    <button class="bg-blue-500 text-white p-2" @click="increment">Increment</button>
                 </div>
             </div>
-         `
+          `
     },
     increment() {
-        //data is the original data, data are signals
+        // data keys are signals
         this.data.counter.value++;
     },
     data(){
@@ -77,16 +78,16 @@ export default {
 //in your main js file
 import { createComponent } from "tinybubble";
 import MyComponent from "./components/MyComponent.js";
-const override = { name 'Hadouken', props: { counter: 5, character: 'Ryu'} };
+const override = { props: { counter: 5, character: 'Ryu' } };
 const myComponent = createComponent(MyComponent,  override);
 myComponent.appendTo(document.body);
 
 ```
 
-### Signal style (Svelte Runes, SolidJs)
+### Signal style (Svelte Runes, SolidJS)
 
 ```javascript
-import { html, effect, createSignal } from "../../../src/index.js";
+import { html, effect, createSignal } from "tinybubble";
 const counter = html(
     /*html*/
     `
@@ -109,7 +110,7 @@ btn.onclick = () => {
 
 ## HTML Component library support
 
-we are just testing shoelace support.
+TinyBubble can work alongside HTML component libraries such as Shoelace.
 
 ### Comes with pub sub utilities to cross notify components
 
@@ -131,6 +132,26 @@ bubble.events.topic("layout").on('resize', (size) => {
 
 ```
 
+### Signals, watch, and untrack
+
+Use `watch()` for lazy reactions to a specific source. Signals read inside the callback are not added as dependencies. Use `untrack()` when you need an untracked read inside a reactive effect.
+
+```javascript
+import { Signal, watch, effect, untrack } from "tinybubble";
+
+const query = Signal("");
+const debug = Signal(false);
+
+watch(query, (next, prev) => {
+    fetchResults(next);
+});
+
+effect(() => {
+    console.log(query.value);
+    untrack(() => console.log(debug.value));
+});
+```
+
 ### Global template helpers via globals
 
 Register any function once and use it in every component template without importing it per-component.
@@ -148,7 +169,15 @@ globals.t = t;
 <button :title="t('save')">Save</button>
 ```
 
-Component methods, data, and props always take precedence over mixin keys, so there are no accidental overrides.
+Component methods, data, and props take precedence over globals with the same name.
+
+### Loops over arrays and objects
+
+```html
+<li x-for="item in items">{{ item.label }}</li>
+<li x-for="(item, index) in items">{{ index }} — {{ item.label }}</li>
+<li x-for="(category, key) in categories">{{ key }} — {{ category.label }}</li>
+```
 
 ### Easy routing included
 
@@ -181,14 +210,16 @@ export default {
   template() {
     /*html*/
     return `
-      <nav>
-        <router-link to="/">Home</router-link>
-        <router-link to="/about">About</router-link>
-        <router-link to="/dashboard">Dashboard</router-link>
-      </nav>
-      <main>
-        <router-view/>
-      </main>
+      <div>
+        <nav>
+          <router-link to="/">Home</router-link>
+          <router-link to="/about">About</router-link>
+          <router-link to="/dashboard">Dashboard</router-link>
+        </nav>
+        <main>
+          <router-view></router-view>
+        </main>
+      </div>
     `;
   },
   components: {
@@ -201,6 +232,8 @@ export default {
 ### Component lazy loading
 
 Keep the bundle tiny by loading components only when needed. You can lazy load router pages via a `src` property, or manually import any component at runtime with `importComponent`.
+
+For Vite builds, prefer static imports with `component:` routes so the bundler can analyze dependencies. The `src` route form is useful for CDN/no-build setups.
 
 ```javascript
 // Lazy route: only fetched when the user navigates to /async
