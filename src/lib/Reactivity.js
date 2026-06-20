@@ -150,10 +150,7 @@ function insertClone(tpl, component, scope, bindNodeFn, disposers) {
     return inserted;
 }
 
-export function handleFor(el, component, localScope, bindNodeFn) {
-    if (!el.hasAttribute('x-for')) return false;
-
-    const attr = el.getAttribute('x-for');
+function parseFor(attr) {
     const [rawItemKey, listExpr] = attr.split(' in ').map(s => s.trim());
     let itemKey = rawItemKey;
     let indexKey = null;
@@ -164,9 +161,15 @@ export function handleFor(el, component, localScope, bindNodeFn) {
         if (itemName) itemKey = itemName;
         if (idxName) indexKey = idxName;
     }
+    return { itemKey, indexKey, listExpr };
+}
 
-    const tpl = extractTemplate(el, 'x-for');
-
+/**
+ * Set up the reactive list-render effect for a prepared template descriptor.
+ * Shared by `x-for` on a normal element and `x-for` on a component root.
+ */
+function runForEffect(tpl, parsed, component, localScope, bindNodeFn) {
+    const { itemKey, indexKey, listExpr } = parsed;
     let renderedItems = [];
     let childDisposers = [];
 
@@ -197,15 +200,25 @@ export function handleFor(el, component, localScope, bindNodeFn) {
         }
     });
 
+    // Teardown: effect dispose alone never removes rendered DOM or child effects.
+    registerDispose(() => {
+        childDisposers.forEach(d => d());
+        renderedItems.forEach(node => node.remove());
+    });
+}
+
+export function handleFor(el, component, localScope, bindNodeFn) {
+    if (!el.hasAttribute('x-for')) return false;
+    const tpl = extractTemplate(el, 'x-for');
+    runForEffect(tpl, parseFor(el.getAttribute('x-for')), component, localScope, bindNodeFn);
     return true;
 }
 
-function handleIf(el, component, localScope, bindNodeFn) {
-    const expr = el.getAttribute('x-if');
-    if (!expr) return false;
-
-    const tpl = extractTemplate(el, 'x-if');
-
+/**
+ * Set up the reactive conditional-render effect for a prepared template descriptor.
+ * Shared by `x-if` on a normal element and `x-if` on a component root.
+ */
+function runIfEffect(tpl, expr, component, localScope, bindNodeFn) {
     let renderedNodes = null;
     let childDisposers = [];
 
@@ -220,6 +233,48 @@ function handleIf(el, component, localScope, bindNodeFn) {
             renderedNodes.forEach(n => n.remove());
             renderedNodes = null;
         }
+    });
+
+    registerDispose(() => {
+        childDisposers.forEach(d => d());
+        renderedNodes?.forEach(n => n.remove());
+    });
+}
+
+function handleIf(el, component, localScope, bindNodeFn) {
+    const expr = el.getAttribute('x-if');
+    if (!expr) return false;
+    const tpl = extractTemplate(el, 'x-if');
+    runIfEffect(tpl, expr, component, localScope, bindNodeFn);
+    return true;
+}
+
+/**
+ * Render a root element that carries x-for / x-if, reusing the component's own
+ * comment anchor as the directive anchor. The root element is never inserted in
+ * the DOM itself; it is cloned per render by insertClone, exactly like a template.
+ */
+function renderRootDirective(component, rootEl, directive, anchor, bindNodeFn) {
+    const isTemplate = rootEl.tagName === 'TEMPLATE';
+    const tpl = {
+        anchor,
+        isTemplate,
+        content: isTemplate ? rootEl.content : rootEl,
+        attrName: directive
+    };
+    if (directive === 'x-for') {
+        runForEffect(tpl, parseFor(rootEl.getAttribute('x-for')), component, {}, bindNodeFn);
+    } else {
+        runIfEffect(tpl, rootEl.getAttribute('x-if'), component, {}, bindNodeFn);
+    }
+}
+
+function handleHtml(el, component, localScope) {
+    if (!el.hasAttribute('x-html')) return false;
+    const expr = el.getAttribute('x-html');
+    effect(() => {
+        const val = evaluate(expr, buildScope(component, localScope), component);
+        el.innerHTML = val ?? '';
     });
     return true;
 }
@@ -352,6 +407,7 @@ function handleCustomComponent(el, component, localScope) {
             attachEvent(childComp.$element, eventName, expr, component, localScope);
         });
         el.replaceWith(childComp.$element);
+        childComp._renderRoot?.();
 
         if (!childComp.data) {
             bindNode(childComp.$element, component, localScope);
@@ -445,19 +501,22 @@ function bindNode(el, component, localScope) {
         // 2. Handle x-if (stops descent if false)
         if (handleIf(el, component, localScope, bindNode)) return;
 
-        // 3. Handle x-show / x-hide
+        // 3. Handle x-html
+        if (handleHtml(el, component, localScope)) return;
+
+        // 4. Handle x-show / x-hide
         handleShowHide(el, component, localScope);
 
-        // 4. Handle Refs
+        // 5. Handle Refs
         handleRefs(el, component);
 
-        // 5. Handle Events
+        // 6. Handle Events
         handleEvents(el, component, localScope);
 
-        // 6. Handle x-model
+        // 7. Handle x-model
         handleModel(el, component, localScope);
 
-        // 7. Handle Nested Components
+        // 8. Handle Nested Components
         if (el != component.$element) {
             if (handleCustomComponent(el, component, localScope)) {
                 boundElements.add(el);
@@ -466,10 +525,10 @@ function bindNode(el, component, localScope) {
         }
         boundElements.add(el);
 
-        // 8. Handle Colon-Prefixed Attributes
+        // 9. Handle Colon-Prefixed Attributes
         handleAttributes(el, component, localScope);
 
-        // 9. Recursion on standard children
+        // 10. Recursion on standard children
         let child = el.firstChild;
         while (child) {
             const next = child.nextSibling;
@@ -511,7 +570,7 @@ export function createComponent(original, data, _props, parent = null, emitListe
         appendTo: (parent) => {
             if (component.$element) {
                 parent.appendChild(component.$element);
-                if (component.mounted) component.mounted();
+                component._renderRoot?.();
             }
         },
         refs: {},
@@ -558,12 +617,27 @@ export function createComponent(original, data, _props, parent = null, emitListe
     if (typeof tp === "function") tp = tp.apply(component);
 
     if (tp !== undefined && tp !== null) {
-        component.$element = html(bubblify(tp));
-    }
+        const rootEl = html(bubblify(tp));
+        const rootDirective = rootEl.hasAttribute('x-for') ? 'x-for'
+            : rootEl.hasAttribute('x-if') ? 'x-if' : null;
 
-    // 7. Start Binding
-    if (component.$element) {
-        component._disposers = collectEffects(() => bindNode(component.$element, component, {}));
+        if (rootDirective) {
+            // Root carries a structural directive: the component "is" a comment
+            // anchor. Content renders as siblings on (re)mount, so it survives
+            // persistent router pages that wipe the outlet between navigations.
+            const anchor = document.createComment(rootDirective + ':root');
+            component.$element = anchor;
+            component._renderRoot = () => {
+                component._disposers?.forEach(d => d());
+                component._disposers = collectEffects(
+                    () => renderRootDirective(component, rootEl, rootDirective, anchor, bindNode)
+                );
+            };
+        } else {
+            // 7. Start Binding (standard single-element root)
+            component.$element = rootEl;
+            component._disposers = collectEffects(() => bindNode(component.$element, component, {}));
+        }
     }
 
     component.$destroy = function () {
@@ -594,6 +668,9 @@ export function createComponent(original, data, _props, parent = null, emitListe
     }
     // 10. Init Lifecycle
     if (component.init) component.init();
+
+    // 11. Call mounted after binding is complete
+    if (component.mounted) component.mounted();
 
     return component;
 }

@@ -180,6 +180,7 @@ export function createRouter({ mode = 'history', base = '/', routes = [], srcBas
                         }
                     }
                     outlet.appendChild(comp.$element);
+                    comp._renderRoot?.();
                     mountedComp = comp;
                     mountedIsPersistent = !!match.persistent;
                 } else {

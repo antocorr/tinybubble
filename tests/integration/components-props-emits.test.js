@@ -72,6 +72,54 @@ describe("components props and emits", () => {
     expect(host.querySelector("#picked").textContent).toContain("2");
   });
 
+  it("calls mounted on child components without appendTo", async () => {
+    const innerMounted = [];
+
+    const GrandChild = {
+      name: "GrandChild",
+      template() {
+        return `<span id="grandchild">grandchild</span>`;
+      },
+      mounted() {
+        innerMounted.push("GrandChild");
+      },
+    };
+
+    const Child = {
+      name: "Child",
+      components: { "grand-child": GrandChild },
+      template() {
+        return `<div id="child"><grand-child></grand-child></div>`;
+      },
+      mounted() {
+        innerMounted.push("Child");
+      },
+    };
+
+    const App = {
+      name: "App",
+      components: { child: Child },
+      template() {
+        return `<div><child></child></div>`;
+      },
+      mounted() {
+        innerMounted.push("App");
+      },
+    };
+
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+
+    const app = createComponent(App);
+    app.appendTo(host);
+
+    expect(innerMounted).toContain("App");
+    expect(innerMounted).toContain("Child");
+    expect(innerMounted).toContain("GrandChild");
+
+    app.$destroy();
+  });
+
   it("matches kebab listeners to camelCase emits", async () => {
     const ChildBox = {
       emits: ["reservationUpdate"],

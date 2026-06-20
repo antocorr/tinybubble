@@ -136,3 +136,9 @@ out
 # Docs site build artifacts
 docs/node_modules/
 docs/dist/
+
+AGENTS.md
+.serena/
+.claude/plans/
+rapidcheck/
+.claude/memory.md

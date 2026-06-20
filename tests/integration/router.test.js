@@ -145,6 +145,54 @@ describe("router", () => {
     expect(document.querySelector("#persist-count").textContent).toContain("1");
   });
 
+  it("renders and re-renders a persistent page whose root is x-for", async () => {
+    window.location.hash = "#/";
+
+    const ListPage = {
+      data() {
+        return { items: ["a", "b", "c"] };
+      },
+      template() {
+        return `<li class="list-row" x-for="item in items">{{ item }}</li>`;
+      },
+    };
+
+    const About = {
+      template() {
+        return `<p id="about-page">About</p>`;
+      },
+    };
+
+    const router = createRouter({
+      mode: "hash",
+      routes: [
+        { path: "/", component: About },
+        { path: "/list", component: ListPage, persistent: true },
+        { path: "/about", component: About },
+      ],
+    });
+
+    mountRouterApp(router);
+
+    router.navigate("/list");
+    await waitFor(() => {
+      expect(document.querySelectorAll(".list-row").length).toBe(3);
+    });
+
+    router.navigate("/about");
+    await waitFor(() => {
+      expect(document.querySelector("#about-page")).not.toBeNull();
+    });
+    expect(document.querySelectorAll(".list-row").length).toBe(0);
+
+    router.navigate("/list");
+    await waitFor(() => {
+      expect(document.querySelectorAll(".list-row").length).toBe(3);
+    });
+    // re-mount must not duplicate rows from the previous render
+    expect(document.querySelectorAll(".list-row").length).toBe(3);
+  });
+
   it("loads route components lazily from src", async () => {
     window.location.hash = "#/";
 

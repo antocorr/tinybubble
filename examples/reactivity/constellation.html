@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Constellation Builder — root x-for / x-if</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background:
+                radial-gradient(1200px 600px at 80% -10%, rgba(99,102,241,0.25), transparent 60%),
+                radial-gradient(900px 500px at 0% 110%, rgba(236,72,153,0.22), transparent 55%),
+                #05060f;
+        }
+        .twinkle { animation: twinkle var(--dur, 2.4s) ease-in-out infinite; }
+        @keyframes twinkle {
+            0%, 100% { opacity: .55; transform: translate(-50%, -50%) scale(.85); }
+            50%      { opacity: 1;   transform: translate(-50%, -50%) scale(1.15); }
+        }
+        .star-btn:hover { filter: brightness(1.6) drop-shadow(0 0 10px currentColor); cursor: pointer; }
+        .glass { background: rgba(255,255,255,0.06); backdrop-filter: blur(12px); }
+        .pop { animation: pop .35s cubic-bezier(.2,1.4,.4,1); }
+        @keyframes pop { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    </style>
+</head>
+<body class="min-h-screen text-white flex items-center justify-center p-4 md:p-8 font-sans">
+    <div id="app" class="w-full max-w-4xl"></div>
+
+    <script type="module">
+        import { createComponent } from "../../../src/index.js";
+
+        // Root is `x-for`: each star becomes a DIRECT child of the sky container,
+        // so absolute positioning works with no wrapper element in the way.
+        const StarField = {
+            name: "StarField",
+            props: ["stars"],
+            emits: ["remove"],
+            template() {
+                return /*html*/`
+                <button x-for="(s, i) in stars"
+                    class="star-btn twinkle absolute leading-none select-none"
+                    title="Click to remove"
+                    :style="'left:' + s.x + '%; top:' + s.y + '%; color: hsl(' + s.hue + ',90%,72%); font-size:' + s.size + 'px; text-shadow:0 0 ' + s.size + 'px currentColor; --dur:' + s.dur + 's;'"
+                    @click="pick(i, $event)">★</button>
+                `;
+            },
+            pick(i, event) {
+                event.stopPropagation();
+                this.emit("remove", i);
+            }
+        };
+
+        // Root is `x-if`: the whole hint mounts/unmounts as one. No leftover wrapper.
+        const IntroHint = {
+            name: "IntroHint",
+            props: ["count"],
+            template() {
+                return /*html*/`
+                <div x-if="count === 0"
+                    class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 text-center px-6">
+                    <div class="text-5xl">✨</div>
+                    <p class="text-lg font-semibold text-white/90">Tap the sky to spawn stars</p>
+                    <p class="text-sm text-white/50">This whole hint is a single <code>x-if</code> root component</p>
+                </div>
+                `;
+            }
+        };
+
+        // Root is `<template x-for>`: emits MULTIPLE sibling pills straight into
+        // the flex toolbar, with no wrapper div breaking the gap layout.
+        const LegendBar = {
+            name: "LegendBar",
+            props: ["stars"],
+            template() {
+                return /*html*/`
+                <template x-for="pill in pills()">
+                    <span class="glass rounded-full px-3 py-1.5 text-sm font-medium ring-1 ring-white/10 whitespace-nowrap">
+                        {{ pill.icon }} {{ pill.label }}
+                    </span>
+                </template>
+                `;
+            },
+            pills() {
+                const list = this.props.stars || [];
+                const hues = new Set(list.map(s => Math.round(s.hue / 30))).size;
+                const biggest = list.reduce((m, s) => s.size > m ? s.size : m, 0);
+                return [
+                    { icon: "✨", label: list.length + " stars" },
+                    { icon: "🎨", label: hues + " color bands" },
+                    { icon: "🌟", label: Math.round(biggest) + "px brightest" }
+                ];
+            }
+        };
+
+        const App = {
+            name: "ConstellationApp",
+            components: {
+                "star-field": StarField,
+                "intro-hint": IntroHint,
+                "legend-bar": LegendBar
+            },
+            data() {
+                return { stars: [] };
+            },
+            spawn(x, y) {
+                const star = {
+                    x, y,
+                    hue: Math.round(Math.random() * 360),
+                    size: 12 + Math.round(Math.random() * 16),
+                    dur: (1.6 + Math.random() * 2.4).toFixed(2)
+                };
+                this.data.stars.value = [...this.data.stars.value, star];
+            },
+            addStar(event) {
+                const rect = event.currentTarget.getBoundingClientRect();
+                const x = ((event.clientX - rect.left) / rect.width) * 100;
+                const y = ((event.clientY - rect.top) / rect.height) * 100;
+                this.spawn(x, y);
+            },
+            removeStar(i) {
+                this.data.stars.value = this.data.stars.value.filter((_, idx) => idx !== i);
+            },
+            shuffle() {
+                const next = [];
+                const n = 6 + Math.round(Math.random() * 6);
+                for (let k = 0; k < n; k++) {
+                    next.push({
+                        x: 6 + Math.random() * 88,
+                        y: 8 + Math.random() * 80,
+                        hue: Math.round(Math.random() * 360),
+                        size: 12 + Math.round(Math.random() * 16),
+                        dur: (1.6 + Math.random() * 2.4).toFixed(2)
+                    });
+                }
+                this.data.stars.value = next;
+            },
+            clear() {
+                this.data.stars.value = [];
+            },
+            template() {
+                return /*html*/`
+                <div class="space-y-5">
+
+                    <header class="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+                        <div>
+                            <h1 class="text-3xl md:text-4xl font-black tracking-tight bg-gradient-to-r from-indigo-300 via-fuchsia-300 to-amber-200 bg-clip-text text-transparent">
+                                Constellation Builder
+                            </h1>
+                            <p class="text-sm text-white/50 mt-1">
+                                Components whose <span class="text-white/80 font-semibold">root</span> is <code>x-for</code>, <code>x-if</code> and <code>&lt;template x-for&gt;</code> — no wrapper elements.
+                            </p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button class="glass rounded-xl px-4 py-2 text-sm font-semibold ring-1 ring-white/10 hover:ring-white/30 transition" @click="shuffle">🎲 Shuffle</button>
+                            <button class="rounded-xl px-4 py-2 text-sm font-semibold bg-white/10 hover:bg-white/20 ring-1 ring-white/10 transition" @click="clear">Clear</button>
+                        </div>
+                    </header>
+
+                    <!-- Toolbar: LegendBar drops its pills directly here as flex children -->
+                    <div class="flex flex-wrap items-center gap-2">
+                        <legend-bar :stars="stars"></legend-bar>
+                    </div>
+
+                    <!-- The sky: a single positioned container.
+                         star-field injects its stars as direct children here. -->
+                    <div class="relative h-[58vh] min-h-[360px] rounded-3xl overflow-hidden ring-1 ring-white/10 shadow-2xl
+                                bg-gradient-to-b from-indigo-950/40 to-black/60 cursor-crosshair"
+                         @click="addStar($event)">
+                        <star-field :stars="stars" @remove="removeStar"></star-field>
+                        <intro-hint :count="stars.length"></intro-hint>
+                    </div>
+
+                    <p class="text-center text-xs text-white/40">
+                        Click empty sky to add a star · click a star to remove it
+                    </p>
+                </div>
+                `;
+            }
+        };
+
+        createComponent(App).appendTo(document.getElementById("app"));
+    </script>
+</body>
+</html>
