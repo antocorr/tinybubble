@@ -122,9 +122,15 @@ export function createRouter({ mode = 'history', base = '/', routes = [], srcBas
     }
 
     function resolveRoute(current) {
-        for (const r of routes) {
+        let routesArray = routes;
+        if (typeof routes === 'function') { 
+            routesArray = routes();
+        }
+        for (const r of routesArray || []) {
             const m = matchRoute(r.path, current);
-            if (m) return { match: r, params: m.params };
+            if (m) {
+                return { match: r, params: m.params };
+            }                 
         }
         return { match: null, params: {} };
     }

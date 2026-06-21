@@ -298,6 +298,20 @@ components: {
 {{ $route.query.tab }}   // query string
 ```
 
+**Dynamic routes (function form):**
+
+`routes` can be a function instead of an array. It is called fresh on every route resolution, so route visibility can react to app state (e.g. auth) without any router API beyond this:
+
+```js
+export const router = createRouter({
+    routes: () => isLoggedIn.value
+        ? [...publicRoutes, ...privateRoutes]
+        : publicRoutes
+});
+```
+
+Because the function runs inside the router's own reactive `effect`, any signal it reads (`isLoggedIn.value` above) is auto-tracked — route resolution re-runs whenever that signal changes, even with no navigation. Keep the function synchronous and cheap: it can be called more than once per resolution (it's read both when `$route` is recomputed and when `RouterView` resolves the component to mount).
+
 **Caveats:**
 - Do not assign `globals.$route = router.route`; `router.route` is not part of the API
 - `$route` updates when the router destination changes, even before `RouterView` mounts
@@ -305,6 +319,7 @@ components: {
 - `persistent: true` keeps the component alive in memory when navigating away
 - Programmatic navigation: `router.navigate("/path")`
 - **Vite builds + `src:` routes:** Vite cannot analyze runtime-computed `import()` URLs. Use static `import` + `component:` when building with Vite. The `src:` approach works fine in CDN/no-build setups.
+- **Function-form `routes`:** when `routes` is a function, `router.routes` (the returned reference) is that function, not a live array — the in-place mutation trick (`router.routes.push(...)`) only works when `routes` was passed as a plain array.
 
 ---
 

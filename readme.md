@@ -229,6 +229,20 @@ export default {
 };
 ```
 
+### Dynamic routes
+
+`routes` also accepts a function instead of an array. It's re-evaluated on every route resolution, so it can react to signals (e.g. auth state) without any extra router API:
+
+```javascript
+export const router = createRouter({
+  routes: () => isLoggedIn.value
+    ? [...publicRoutes, ...privateRoutes]
+    : publicRoutes,
+});
+```
+
+Reading a signal inside the function makes route resolution reactive to it — routes update even without navigating, since the function runs inside the router's own effect.
+
 ### Component lazy loading
 
 Keep the bundle tiny by loading components only when needed. You can lazy load router pages via a `src` property, or manually import any component at runtime with `importComponent`.

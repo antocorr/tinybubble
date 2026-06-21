@@ -8,6 +8,7 @@ All notable changes to this project are documented in this file.
 - Added support for `x-for` and `x-if` directly on a component's root element: the component becomes a comment anchor and re-renders its content as siblings, so structural directives survive persistent router pages that wipe and reuse the outlet between navigations.
 - Added the `x-html` directive to bind an expression to an element's `innerHTML`.
 - Added integration tests covering root-level `x-for`/`x-if`, `x-html`, component props/emits, and router persistent pages.
+- Added support for `routes` as a function in `createRouter()`, re-evaluated on every route resolution so route visibility can react to signals (e.g. auth state) without extra router API.
 
 ### Changed
 - `mounted()` is now called once binding is fully complete, instead of partway through component creation; it is also re-invoked whenever a root-directive component re-renders (e.g. on router remount).
