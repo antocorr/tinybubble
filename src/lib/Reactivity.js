@@ -41,28 +41,50 @@ function bubblify(str) {
     });
 }
 
-
+/**
+ * Resolve a value that may be a function (called with `ctx` as this)
+ */
+function resolve(v, ctx) {
+    return typeof v === "function" ? v.call(ctx) : v;
+}
 
 // ============================================================
 // SCOPE AND PROPS HELPERS
 // ============================================================
 
 /**
- * Build the scope for template evaluation
- * Uses _propsSignals for reactivity in templates
+ * Build the scope for template evaluation.
+ * Uses _propsSignals for reactivity in templates.
+ * `globals + methods` are fixed once the component mounts and are cached
+ * permanently. `data` and `propsSignals` are read live on every call —
+ * `data` in particular can grow after the first render (e.g. a Signal
+ * added inside a lifecycle hook), so it must never be snapshotted.
+ * Consumers must read keys (`in` / property access), never spread/enumerate.
  */
-function buildScope(component, localScope = {}) {
-    return {
-        ...globals,
-        ...component._methods,
-        ...component.data,
-        ...component._propsSignals,
-        ...localScope
-    };
+function buildScope(component, localScope) {
+    let base = component._scopeBase;
+    if (!base) {
+        base = component._scopeBase = Object.assign(Object.create(globals), component._methods);
+    }
+    return Object.assign(Object.create(base), component.data, component._propsSignals, localScope);
 }
 
 function caseSensitiveToHyphen(str) {
     return str.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
+}
+
+/**
+ * Reactively evaluate `expr` in the component scope and apply the result.
+ */
+function bindExpr(expr, component, localScope, apply) {
+    effect(() => apply(evaluate(expr, buildScope(component, localScope), component)));
+}
+
+/**
+ * Match `key` against declared names (props/emits), normalizing camelCase/kebab-case
+ */
+function matchDeclared(names, key) {
+    return names.find(n => caseSensitiveToHyphen(n) === key || n.toLowerCase() === key.toLowerCase());
 }
 
 /**
@@ -71,7 +93,7 @@ function caseSensitiveToHyphen(str) {
 function createProps(propKeys, incoming) {
     const _signals = {};
     for (const k in incoming) {
-        const definedKey = propKeys.find(pk => caseSensitiveToHyphen(pk) === k || pk.toLowerCase() === k.toLowerCase()) || k;
+        const definedKey = matchDeclared(propKeys, k) || k;
         _signals[definedKey] = incoming[k] instanceof SignalObject ? incoming[k] : Signal(incoming[k]);
     }
     for (const k of propKeys) {
@@ -174,6 +196,38 @@ function parseFor(attr) {
 }
 
 /**
+ * Parse the x-for expression and capture :key before the attr binder sees it
+ */
+function prepareFor(el) {
+    const parsed = parseFor(el.getAttribute('x-for'));
+    parsed.keyExpr = el.getAttribute(':key');
+    el.removeAttribute(':key');
+    return parsed;
+}
+
+/**
+ * Dispose child effects and remove rendered nodes. Shared teardown of x-for / x-if.
+ */
+function teardown(disposers, nodes) {
+    disposers.forEach(d => d());
+    nodes?.forEach(n => n.remove());
+}
+
+/**
+ * Local scope for one loop item (index/key added only when requested)
+ */
+function itemScope(localScope, itemKey, item, indexKey, idx) {
+    const scope = { ...localScope, [itemKey]: item };
+    if (indexKey) scope[indexKey] = idx;
+    return scope;
+}
+
+function evalList(listExpr, component, localScope) {
+    const list = listExpr ? evaluate(listExpr, buildScope(component, localScope), component) : [];
+    return list instanceof SignalObject ? list.value : list;
+}
+
+/**
  * Set up the reactive list-render effect for a prepared template descriptor.
  * Shared by `x-for` on a normal element and `x-for` on a component root.
  */
@@ -184,37 +238,23 @@ function runForEffect(tpl, parsed, component, localScope, bindNodeFn) {
     let childDisposers = [];
 
     effect(() => {
-        childDisposers.forEach(d => d());
+        teardown(childDisposers, renderedItems);
         childDisposers = [];
-        renderedItems.forEach(node => node.remove());
         renderedItems = [];
 
-        const currentScope = buildScope(component, localScope);
-        let list = listExpr ? evaluate(listExpr, currentScope, component) : [];
-        if (list instanceof SignalObject) list = list.value;
+        const list = evalList(listExpr, component, localScope);
+        const pairs = Array.isArray(list) ? list.map((v, i) => [v, i])
+            : list && typeof list === "object" ? Object.entries(list).map(([k, v]) => [v, k])
+            : [];
 
-        if (Array.isArray(list)) {
-            list.forEach((itemData, idx) => {
-                const scoped = indexKey
-                    ? { ...localScope, [itemKey]: itemData, [indexKey]: idx }
-                    : { ...localScope, [itemKey]: itemData };
-                renderedItems.push(...insertClone(tpl, component, scoped, bindNodeFn, childDisposers));
-            });
-        } else if (list && typeof list === "object") {
-            for (const key in list) {
-                const scoped = indexKey
-                    ? { ...localScope, [itemKey]: list[key], [indexKey]: key }
-                    : { ...localScope, [itemKey]: list[key] };
-                renderedItems.push(...insertClone(tpl, component, scoped, bindNodeFn, childDisposers));
-            }
-        }
+        pairs.forEach(([itemData, idx]) => {
+            const scoped = itemScope(localScope, itemKey, itemData, indexKey, idx);
+            renderedItems.push(...insertClone(tpl, component, scoped, bindNodeFn, childDisposers));
+        });
     });
 
     // Teardown: effect dispose alone never removes rendered DOM or child effects.
-    registerDispose(() => {
-        childDisposers.forEach(d => d());
-        renderedItems.forEach(node => node.remove());
-    });
+    registerDispose(() => teardown(childDisposers, renderedItems));
 }
 
 /**
@@ -227,9 +267,7 @@ function runKeyedForEffect(tpl, parsed, component, localScope, bindNodeFn) {
     let entries = new Map();   // key -> { nodes, disposers, itemSig, indexSig }
 
     effect(() => {
-        const currentScope = buildScope(component, localScope);
-        let list = listExpr ? evaluate(listExpr, currentScope, component) : [];
-        if (list instanceof SignalObject) list = list.value;
+        let list = evalList(listExpr, component, localScope);
         if (!Array.isArray(list)) list = [];
 
         const anchor = tpl.anchor;
@@ -237,9 +275,7 @@ function runKeyedForEffect(tpl, parsed, component, localScope, bindNodeFn) {
         const next = new Map();
 
         list.forEach((itemData, idx) => {
-            const keyScope = indexKey
-                ? { ...localScope, [itemKey]: itemData, [indexKey]: idx }
-                : { ...localScope, [itemKey]: itemData };
+            const keyScope = itemScope(localScope, itemKey, itemData, indexKey, idx);
             const key = evaluate(keyExpr, keyScope, component);
 
             let entry = entries.get(key);
@@ -250,9 +286,7 @@ function runKeyedForEffect(tpl, parsed, component, localScope, bindNodeFn) {
             } else {
                 const itemSig = Signal(itemData);
                 const indexSig = indexKey ? Signal(idx) : null;
-                const scope = indexKey
-                    ? { ...localScope, [itemKey]: itemSig, [indexKey]: indexSig }
-                    : { ...localScope, [itemKey]: itemSig };
+                const scope = itemScope(localScope, itemKey, itemSig, indexKey, indexSig);
                 const disposers = [];
                 const nodes = insertClone(tpl, component, scope, bindNodeFn, disposers);
                 entry = { nodes, disposers, itemSig, indexSig };
@@ -261,28 +295,17 @@ function runKeyedForEffect(tpl, parsed, component, localScope, bindNodeFn) {
             next.set(key, entry);
         });
 
-        entries.forEach(e => {                                          // leftovers were removed
-            e.disposers.forEach(d => d());
-            e.nodes.forEach(n => n.remove());
-        });
+        entries.forEach(e => teardown(e.disposers, e.nodes));           // leftovers were removed
         entries = next;
     });
 
-    registerDispose(() => {
-        entries.forEach(e => {
-            e.disposers.forEach(d => d());
-            e.nodes.forEach(n => n.remove());
-        });
-    });
+    registerDispose(() => entries.forEach(e => teardown(e.disposers, e.nodes)));
 }
 
 export function handleFor(el, component, localScope, bindNodeFn) {
     if (!el.hasAttribute('x-for')) return false;
-    const keyExpr = el.getAttribute(':key');
-    el.removeAttribute(':key');                 // don't let the attr binder process it
+    const parsed = prepareFor(el);
     const tpl = extractTemplate(el, 'x-for');
-    const parsed = parseFor(el.getAttribute('x-for'));
-    parsed.keyExpr = keyExpr;
     runForEffect(tpl, parsed, component, localScope, bindNodeFn);
     return true;
 }
@@ -295,23 +318,17 @@ function runIfEffect(tpl, expr, component, localScope, bindNodeFn) {
     let renderedNodes = null;
     let childDisposers = [];
 
-    effect(() => {
-        const result = evaluate(expr, buildScope(component, localScope), component);
-
+    bindExpr(expr, component, localScope, result => {
         if (result && !renderedNodes) {
             renderedNodes = insertClone(tpl, component, localScope, bindNodeFn, childDisposers);
         } else if (!result && renderedNodes) {
-            childDisposers.forEach(d => d());
+            teardown(childDisposers, renderedNodes);
             childDisposers = [];
-            renderedNodes.forEach(n => n.remove());
             renderedNodes = null;
         }
     });
 
-    registerDispose(() => {
-        childDisposers.forEach(d => d());
-        renderedNodes?.forEach(n => n.remove());
-    });
+    registerDispose(() => teardown(childDisposers, renderedNodes));
 }
 
 function handleIf(el, component, localScope, bindNodeFn) {
@@ -336,10 +353,7 @@ function renderRootDirective(component, rootEl, directive, anchor, bindNodeFn) {
         attrName: directive
     };
     if (directive === 'x-for') {
-        const parsed = parseFor(rootEl.getAttribute('x-for'));
-        parsed.keyExpr = rootEl.getAttribute(':key');
-        rootEl.removeAttribute(':key');
-        runForEffect(tpl, parsed, component, {}, bindNodeFn);
+        runForEffect(tpl, prepareFor(rootEl), component, {}, bindNodeFn);
     } else {
         runIfEffect(tpl, rootEl.getAttribute('x-if'), component, {}, bindNodeFn);
     }
@@ -347,9 +361,7 @@ function renderRootDirective(component, rootEl, directive, anchor, bindNodeFn) {
 
 function handleHtml(el, component, localScope) {
     if (!el.hasAttribute('x-html')) return false;
-    const expr = el.getAttribute('x-html');
-    effect(() => {
-        const val = evaluate(expr, buildScope(component, localScope), component);
+    bindExpr(el.getAttribute('x-html'), component, localScope, val => {
         el.innerHTML = val ?? '';
     });
     return true;
@@ -358,9 +370,7 @@ function handleHtml(el, component, localScope) {
 function handleShowHide(el, component, localScope) {
     const isShow = el.hasAttribute('x-show');
     if (!isShow && !el.hasAttribute('x-hide')) return;
-    const expr = el.getAttribute(isShow ? 'x-show' : 'x-hide');
-    effect(() => {
-        let res = evaluate(expr, buildScope(component, localScope), component);
+    bindExpr(el.getAttribute(isShow ? 'x-show' : 'x-hide'), component, localScope, res => {
         el.style.display = (isShow ? res : !res) ? '' : 'none';
     });
 }
@@ -384,7 +394,8 @@ function attachEvent(el, eventName, expr, component, localScope) {
     }
     el.addEventListener(eventName, (event) => {
         if (prevent) event.preventDefault();
-        const scope = { ...buildScope(component, localScope), $event: event };
+        const scope = buildScope(component, localScope);
+        scope.$event = event;
         if (['input', 'change'].includes(eventName)) {
             invokeExpr(expr, component, scope, [event.target.value, oldVal, event]);
             oldVal = event.target.value;
@@ -435,6 +446,7 @@ function handleModel(el, component, localScope) {
 
 function handleCustomComponent(el, component, localScope) {
     const tagName = el.tagName.toLowerCase();
+    if (boundElements.has(el)) return false;
     if (component.components && component.components[tagName]) {
         const currentScope = buildScope(component, localScope);
         const compDef = component.components[tagName];
@@ -456,15 +468,13 @@ function handleCustomComponent(el, component, localScope) {
                 }
             } else if (attr.name.startsWith('-x-on:')) {
                 const eventName = attr.name.replace('-x-on:', '');
-                const definedEvent = componentEmits.find(e => caseSensitiveToHyphen(e) === eventName || e.toLowerCase() === eventName.toLowerCase());
+                const definedEvent = matchDeclared(componentEmits, eventName);
                 if (definedEvent) {
                     if (!emitListeners[definedEvent]) emitListeners[definedEvent] = [];
                     emitListeners[definedEvent].push((...args) => {
-                        const scope = {
-                            ...buildScope(component, localScope),
-                            $event: args[0],
-                            $args: args
-                        };
+                        const scope = buildScope(component, localScope);
+                        scope.$event = args[0];
+                        scope.$args = args;
                         invokeExpr(attr.value, component, scope, args);
                     });
                 } else {
@@ -474,8 +484,6 @@ function handleCustomComponent(el, component, localScope) {
                 childProps[attr.name] = attr.value;
             }
         });
-
-        if (boundElements.has(el)) return;
 
         const childComp = createComponent(compDef, undefined, childProps, component, emitListeners);
         registerDispose(() => childComp.$destroy());
@@ -510,57 +518,50 @@ function handleTextNode(el, component, localScope) {
 // CORE: Recursive binding function (Traverse)
 // ============================================================
 
+function toClassString(val) {
+    if (Array.isArray(val)) return val.filter(Boolean).join(' ');
+    if (val && typeof val === 'object') {
+        return Object.entries(val).filter(([, v]) => v).map(([k]) => k).join(' ');
+    }
+    return val ?? '';
+}
+
+function toStyleString(val) {
+    if (val && typeof val === 'object' && !Array.isArray(val)) {
+        return Object.entries(val)
+            .filter(([, v]) => v !== false && v != null)
+            .map(([k, v]) => `${k.replace(/([A-Z])/g, '-$1').toLowerCase()}: ${v}`)
+            .join('; ');
+    }
+    return val ?? '';
+}
+
 function handleAttributes(el, component, localScope) {
     [...el.attributes].forEach(attr => {
-        if (attr.name.startsWith(':')) {
-            const attrName = attr.name.substring(1);
-            const expr = attr.value;
-            const baseAttr = (attrName === 'class' || attrName === 'style')
-                ? (el.getAttribute(attrName) || '').trim().replace(/;\s*$/, '')
-                : '';
-            effect(() => {
-                const currentScope = buildScope(component, localScope);
-                const val = evaluate(expr, currentScope, component);
-                if (attrName === 'class') {
-                    let dynamicClass = '';
-                    if (Array.isArray(val)) {
-                        dynamicClass = val.filter(Boolean).join(' ');
-                    } else if (val && typeof val === 'object') {
-                        dynamicClass = Object.entries(val)
-                            .filter(([, v]) => v).map(([k]) => k).join(' ');
-                    } else {
-                        dynamicClass = val ?? '';
-                    }
-                    const nextClass = [baseAttr, String(dynamicClass).trim()].filter(Boolean).join(' ');
-                    if (nextClass) el.setAttribute('class', nextClass);
-                    else el.removeAttribute('class');
-                } else if (attrName === 'style') {
-                    let dynamicStyle = '';
-                    if (val && typeof val === 'object' && !Array.isArray(val)) {
-                        dynamicStyle = Object.entries(val)
-                            .filter(([, v]) => v !== false && v != null)
-                            .map(([k, v]) => `${k.replace(/([A-Z])/g, '-$1').toLowerCase()}: ${v}`)
-                            .join('; ');
-                    } else {
-                        dynamicStyle = val ?? '';
-                    }
-                    const nextStyle = [baseAttr, String(dynamicStyle).trim().replace(/;\s*$/, '')]
-                        .filter(Boolean)
-                        .join('; ');
-                    if (nextStyle) el.setAttribute('style', nextStyle);
-                    else el.removeAttribute('style');
-                } else if (val !== undefined && val !== null) {
-                    if (BOOLEAN_ATTRS.has(attrName)) {
-                        if (!val) el.removeAttribute(attrName);
-                        else el.setAttribute(attrName, '');
-                    } else {
-                        el.setAttribute(attrName, val);
-                    }
-                } else {
-                    el.removeAttribute(attrName);
-                }
-            });
-        }
+        if (!attr.name.startsWith(':')) return;
+        const attrName = attr.name.substring(1);
+        const baseAttr = (attrName === 'class' || attrName === 'style')
+            ? (el.getAttribute(attrName) || '').trim().replace(/;\s*$/, '')
+            : '';
+        bindExpr(attr.value, component, localScope, val => {
+            if (attrName === 'class') {
+                const next = [baseAttr, String(toClassString(val)).trim()].filter(Boolean).join(' ');
+                if (next) el.setAttribute('class', next);
+                else el.removeAttribute('class');
+            } else if (attrName === 'style') {
+                const next = [baseAttr, String(toStyleString(val)).trim().replace(/;\s*$/, '')]
+                    .filter(Boolean).join('; ');
+                if (next) el.setAttribute('style', next);
+                else el.removeAttribute('style');
+            } else if (val === undefined || val === null) {
+                el.removeAttribute(attrName);
+            } else if (BOOLEAN_ATTRS.has(attrName)) {
+                if (val) el.setAttribute(attrName, '');
+                else el.removeAttribute(attrName);
+            } else {
+                el.setAttribute(attrName, val);
+            }
+        });
     });
 }
 
@@ -635,7 +636,7 @@ export function createComponent(original, data, _props, parent = null, emitListe
     // 1. Handle initial Props
     let props = {};
     if (data && data.props) {
-        props = typeof data.props === "function" ? data.props() : data.props;
+        props = resolve(data.props, data);
         delete data.props;
     }
 
@@ -674,7 +675,7 @@ export function createComponent(original, data, _props, parent = null, emitListe
 
     // 4. Initialize Data as Signals
     if (dataFn) {
-        const initData = typeof dataFn === 'function' ? dataFn.call(component) : dataFn;
+        const initData = resolve(dataFn, component);
         const merged = { ...initData, ...props };
         for (const key in merged) {
             component.data[key] = Signal(merged[key]);
@@ -689,8 +690,7 @@ export function createComponent(original, data, _props, parent = null, emitListe
     }
 
     // 6. Handle Template
-    let tp = component.setTemplate ? component.setTemplate : component.template;
-    if (typeof tp === "function") tp = tp.apply(component);
+    const tp = resolve(component.setTemplate || component.template, component);
 
     if (tp !== undefined && tp !== null) {
         const rootEl = html(bubblify(tp));
@@ -733,16 +733,14 @@ export function createComponent(original, data, _props, parent = null, emitListe
 
     // 8. Handle Scoped/Global CSS
     if (component.style && !styleTagsAdded.has(component.compId)) {
-        let style = typeof component.style === "function" ? component.style() : component.style;
-        const styleTag = html(`<style>${style}</style>`);
-        document.head.appendChild(styleTag);
+        const style = resolve(component.style, component);
+        document.head.appendChild(html(`<style>${style}</style>`));
         if (component.compId) styleTagsAdded.add(component.compId);
     }
     // 9. Handle style links
-    if (component.styleURL && !styleTagsAdded.has(component.styleURL)) { 
-        const url = typeof component.styleURL === "function" ? component.styleURL() : component.styleURL;
-        const linkTag = html(`<link rel="stylesheet" href="${url}">`);
-        document.head.appendChild(linkTag);
+    if (component.styleURL && !styleTagsAdded.has(component.styleURL)) {
+        const url = resolve(component.styleURL, component);
+        document.head.appendChild(html(`<link rel="stylesheet" href="${url}">`));
         styleTagsAdded.add(url);
     }
     // 10. Init Lifecycle
