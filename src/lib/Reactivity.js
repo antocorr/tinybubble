@@ -243,14 +243,16 @@ function runForEffect(tpl, parsed, component, localScope, bindNodeFn) {
         renderedItems = [];
 
         const list = evalList(listExpr, component, localScope);
-        const pairs = Array.isArray(list) ? list.map((v, i) => [v, i])
-            : list && typeof list === "object" ? Object.entries(list).map(([k, v]) => [v, k])
-            : [];
-
-        pairs.forEach(([itemData, idx]) => {
+        const renderItem = (itemData, idx) => {
             const scoped = itemScope(localScope, itemKey, itemData, indexKey, idx);
             renderedItems.push(...insertClone(tpl, component, scoped, bindNodeFn, childDisposers));
-        });
+        };
+
+        if (Array.isArray(list)) {
+            list.forEach(renderItem);
+        } else if (list && typeof list === "object") {
+            for (const key in list) renderItem(list[key], key);
+        }
     });
 
     // Teardown: effect dispose alone never removes rendered DOM or child effects.
