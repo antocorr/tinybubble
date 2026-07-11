@@ -6,14 +6,13 @@ let batchScheduled = false;
 
 function flushEffects() {
     batchScheduled = false;
-    const batch = [...pendingEffects];
-    pendingEffects.clear();
+    const batch = pendingEffects;
+    pendingEffects = new Set();
     for (const fn of batch) {
         if (!fn._disposed) {
             const prev = current;
             current = fn;
-            fn();
-            current = prev;
+            try { fn(); } finally { current = prev; }
         }
     }
 }
@@ -67,10 +66,15 @@ export function registerDispose(fn) {
  * @returns {Function} dispose
  */
 export function effect(fn) {
-    current = fn;
-    fn();
-    current = null;
-    const dispose = () => { fn._disposed = true; };
+    fn._deps = new Set();          // subscriber sets this effect joined, for O(1) unsubscribe
+    const prev = current;          // restore, so effects created inside a running effect
+    current = fn;                  // don't break the outer effect's tracking
+    try { fn(); } finally { current = prev; }
+    const dispose = () => {
+        fn._disposed = true;
+        fn._deps.forEach(subs => subs.delete(fn));
+        fn._deps.clear();
+    };
     if (_effectScope) _effectScope.push(dispose);
     return dispose;
 }
@@ -117,7 +121,10 @@ export class SignalObject {
     }
 
     get value() {
-        if (current) this._subscribers.add(current);
+        if (current) {
+            this._subscribers.add(current);
+            current._deps?.add(this._subscribers);
+        }
         return this._value;
     }
 
