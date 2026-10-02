@@ -19,6 +19,22 @@ import { createComponent } from "https://cdn.jsdelivr.net/npm/tinybubble/dist/bu
 ```shell
 npm i tinybubble
 ```
+
+### Optional plugins from the Git dependency
+
+The TinyBubble package includes `plugins/bubble-store/` and `plugins/bubble-translate/`. They are shipped as files, not bundled into the core, events, or full entry points.
+
+To use the plugins from the `edge` branch, install TinyBubble first, then install the plugin packages from its local directory:
+
+```shell
+npm install github:antocorr/tinybubble#edge
+npm install ./node_modules/tinybubble/plugins/bubble-store ./node_modules/tinybubble/plugins/bubble-translate
+```
+
+Install only the plugin you need if you do not use both. This selects the plugin sources included in that TinyBubble checkout; it does not fetch a separate plugin release. After updating TinyBubble, reinstall the local plugin dependencies to use the updated sources.
+
+Import them by their own package names: `bubble-store`, `bubble-store/bubble`, and `bubble-translate/bubble`. The `tinybubble/plugins/...` paths are not exposed by TinyBubble's `exports`.
+
 ## AI FRIENDLY
 
 Being small and relatively simple, and by pairing it with Tailwind, you can create all sorts of components using any LLM.
@@ -228,9 +244,41 @@ Component methods, data, and props always take precedence over globals, so there
 
 See the full working example: [`examples/reactivity/helpers.html`](examples/reactivity/helpers.html)
 
+### Translation — bubble-translate plugin
+
+`bubble-translate` provides translations, language-file caching, and `%s` placeholders. Install it using the [plugin installation steps](#optional-plugins-from-the-git-dependency) above.
+
+For TinyBubble, use the `/bubble` integration to register `globals.t` and make template translations reactive to language changes:
+
+```javascript
+import { createComponent, globals } from 'tinybubble';
+import { createTranslate } from 'bubble-translate/bubble';
+import App from './components/App.js';
+
+const t = createTranslate({
+    defaultLang: 'en',
+    storageKey: 'app.lang',
+    url: (lang) => `./localization/${lang}.json`,
+});
+
+await t.setLang(t.lang);
+createComponent(App).appendTo(document.getElementById('app'));
+
+// Switch language from application code.
+await globals.t.setLang('it');
+```
+
+```html
+<!-- Inside a component template. -->
+<p>{{ t('Welcome') }}</p>
+<p>{{ t('Hello %s', name) }}</p>
+```
+
+Language files are JSON objects mapping messages to translations. Missing messages fall back to the original text. Use `bubble-translate` for the framework-independent translator, or `bubble-translate/vue` for the Vue integration (requires Vue).
+
 ### State management — bubble-store plugin
 
-`bubble-store` is an optional plugin that brings Redux-style state management with full Signal integration. Install it from `plugins/bubble-store`.
+`bubble-store` is an optional plugin that brings Redux-style state management with full Signal integration. Install it using the [plugin installation steps](#optional-plugins-from-the-git-dependency) above.
 
 **What it includes:**
 - `createStore(rootReducer, initialState, devtools?)` — Redux-like store with optional Redux DevTools support
