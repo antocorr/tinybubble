@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createComponent } from "../../src/index.js";
 import { flushMicrotasks } from "../setup/test-helpers.js";
 
@@ -368,5 +368,416 @@ describe("reactivity directives", () => {
     const lis = outlet.querySelectorAll("li");
     expect(lis.length).toBe(2); // exactly 2 — no duplicates from the stale effect
     expect(lis[0].textContent).toContain("a");
+  });
+
+  // ─── Event modifiers (@event.modifier) ────────────────────────────────
+  // Regression: `@pointerdown.stop` was left as a raw (dead) HTML attribute
+  // because bubblify only matched a bare `@event=`. Guards the board drag bug.
+
+  it("binds @pointerdown.stop and stops propagation (card drag regression)", async () => {
+    let fired = 0;
+    let bubbledToBoard = 0;
+    const App = {
+      template() {
+        return `
+          <div id="board" @pointerdown="onBoardPointerDown">
+            <article id="card" data-drag-task="t1" @pointerdown.stop="onCardPointerDown($event, task)">Card</article>
+          </div>
+        `;
+      },
+      data() {
+        return { task: { id: "t1" } };
+      },
+      onBoardPointerDown() {
+        bubbledToBoard += 1;
+      },
+      onCardPointerDown(event, task) {
+        fired += 1;
+        expect(event).toBeDefined();
+        expect(task.id).toBe("t1");
+      },
+    };
+
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const app = createComponent(App);
+    app.appendTo(host);
+    await flushMicrotasks();
+
+    const card = host.querySelector("#card");
+    expect(card.getAttribute("@pointerdown")).toBeNull(); // sugar was rewritten/consumed
+    card.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: 10, clientY: 10 }));
+
+    expect(fired).toBe(1);
+    expect(bubbledToBoard).toBe(0); // `.stop` blocked bubbling to the board
+    app.$destroy();
+  });
+
+  it("binds @click.stop so the board menu click does not leak", async () => {
+    let inner = 0;
+    let outer = 0;
+    const App = {
+      template() {
+        return `<div id="col" @click="onCol"><button id="menu" data-no-drag @click.stop="onMenu">M</button></div>`;
+      },
+      onCol() {
+        outer += 1;
+      },
+      onMenu() {
+        inner += 1;
+      },
+    };
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const app = createComponent(App);
+    app.appendTo(host);
+    await flushMicrotasks();
+    host.querySelector("#menu").click();
+    expect(inner).toBe(1);
+    expect(outer).toBe(0);
+    app.$destroy();
+  });
+
+  it("applies @submit.prevent (prevents default) and fires the handler", async () => {
+    let prevented = false;
+    let fired = 0;
+    const App = {
+      template() {
+        return `<form @submit.prevent="onSubmit"><button type="submit">Go</button></form>`;
+      },
+      onSubmit(event) {
+        fired += 1;
+        prevented = event.defaultPrevented;
+      },
+    };
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const app = createComponent(App);
+    app.appendTo(host);
+    await flushMicrotasks();
+    host.querySelector("button").click();
+    expect(fired).toBe(1);
+    expect(prevented).toBe(true);
+    app.$destroy();
+  });
+
+  it("filters @keydown.enter to the Enter key and passes $event", async () => {
+    let enterFired = 0;
+    let keyFired = 0;
+    const App = {
+      template() {
+        return `<input id="inp" @keydown.enter="onEnter">`;
+      },
+      onEnter(event) {
+        enterFired += 1;
+        expect(event.key).toBe("Enter");
+      },
+    };
+    const AppKey = {
+      template() {
+        return `<input id="inp2" @keydown="onKey">`;
+      },
+      onKey() {
+        keyFired += 1;
+      },
+    };
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const app = createComponent(App);
+    app.appendTo(host);
+    const app2 = createComponent(AppKey);
+    app2.appendTo(host);
+    await flushMicrotasks();
+
+    host.querySelector("#inp").dispatchEvent(new KeyboardEvent("keydown", { key: "a", bubbles: true }));
+    expect(enterFired).toBe(0); // non-Enter key ignored
+    host.querySelector("#inp").dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(enterFired).toBe(1);
+
+    host.querySelector("#inp2").dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(keyFired).toBe(1); // plain @keydown still fires for any key
+    app.$destroy();
+    app2.$destroy();
+  });
+
+  it("combines @keydown.enter.prevent", async () => {
+    let enterFired = 0;
+    let prevented = false;
+    const App = {
+      template() {
+        return `<input id="inp" @keydown.enter.prevent="onEnter">`;
+      },
+      onEnter(event) {
+        enterFired += 1;
+        prevented = event.defaultPrevented;
+      },
+    };
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const app = createComponent(App);
+    app.appendTo(host);
+    await flushMicrotasks();
+
+    host.querySelector("#inp").dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    expect(enterFired).toBe(1);
+    expect(prevented).toBe(true);
+    // a non-Enter key is filtered out before the handler runs
+    host.querySelector("#inp").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    expect(enterFired).toBe(1);
+    app.$destroy();
+  });
+
+  it.each([
+    ["enter", "Enter"], ["escape", "Escape"], ["esc", "Escape"], ["tab", "Tab"],
+    ["space", " "], ["spacebar", " "], ["up", "ArrowUp"], ["down", "ArrowDown"],
+    ["left", "ArrowLeft"], ["right", "ArrowRight"], ["backspace", "Backspace"],
+    ["delete", "Delete"], ["del", "Delete"], ["home", "Home"], ["end", "End"],
+    ["pageup", "PageUp"], ["pagedown", "PageDown"],
+  ])("matches .%s to %s", (modifier, key) => {
+    let calls = 0;
+    const app = createComponent({
+      template() { return `<input @keydown.${modifier}="onKey">`; },
+      onKey(event) { expect(event.key).toBe(key); calls++; },
+    });
+    app.$element.dispatchEvent(new KeyboardEvent("keydown", { key: "Unidentified" }));
+    app.$element.dispatchEvent(new KeyboardEvent("keydown", { key }));
+    expect(calls).toBe(1);
+    app.$destroy();
+  });
+
+  it("preserves input handler this, current value, previous value and native event", () => {
+    const seen = [];
+    const app = createComponent({
+      name: "InputPage",
+      template() { return `<input value="initial" @input="receive">`; },
+      receive(value, previous, event) { seen.push([this.name, value, previous, event]); },
+    });
+    const event = new Event("input", { bubbles: true });
+    app.$element.value = "updated";
+    app.$element.dispatchEvent(event);
+    expect(seen).toEqual([["InputPage", "updated", "initial", event]]);
+    app.$destroy();
+  });
+
+  it("matches arrow aliases and only prevents matching keys", () => {
+    const seen = [];
+    const App = {
+      template() {
+        return `<div><input id="arrows" @keydown.up="onUp"><input id="enter" @keydown.enter.prevent.stop="onEnter"></div>`;
+      },
+      onUp(event) { seen.push(event.key); },
+      onEnter(event) { seen.push(event.key); },
+    };
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const app = createComponent(App);
+    app.appendTo(host);
+    const parent = host.querySelector("div");
+    let bubbled = 0;
+    parent.addEventListener("keydown", () => { bubbled++; });
+
+    const up = new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true, cancelable: true });
+    host.querySelector("#arrows").dispatchEvent(up);
+    const other = new KeyboardEvent("keydown", { key: "a", bubbles: true, cancelable: true });
+    host.querySelector("#enter").dispatchEvent(other);
+    const enter = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
+    host.querySelector("#enter").dispatchEvent(enter);
+
+    expect(seen).toEqual(["ArrowUp", "Enter"]);
+    expect(other.defaultPrevented).toBe(false);
+    expect(enter.defaultPrevented).toBe(true);
+    expect(bubbled).toBe(2);
+    app.$destroy();
+  });
+
+  it("does not prevent or consume a child event filtered by .self", () => {
+    let called = 0;
+    const app = createComponent({
+      template() { return `<div @click.self.prevent.stop="hit"><button>Child</button></div>`; },
+      hit() { called++; },
+    });
+    const host = document.createElement("section");
+    document.body.appendChild(host);
+    app.appendTo(host);
+    let bubbled = 0;
+    host.addEventListener("click", () => { bubbled++; });
+    const childClick = new MouseEvent("click", { bubbles: true, cancelable: true });
+    host.querySelector("button").dispatchEvent(childClick);
+    expect(called).toBe(0);
+    expect(childClick.defaultPrevented).toBe(false);
+    expect(bubbled).toBe(1);
+    app.$destroy();
+  });
+
+  it("evaluates text bindings once on mount", () => {
+    let reads = 0;
+    const app = createComponent({
+      template() { return `<p>{{ label() }}</p>`; },
+      label() { reads++; return "Ready"; },
+    });
+    expect(app.$element.textContent).toBe("Ready");
+    expect(reads).toBe(1);
+    app.$destroy();
+  });
+
+  it("matches .space.prevent without cancelling unrelated keys", () => {
+    let calls = 0;
+    const app = createComponent({
+      template() { return `<div tabindex="0" @keydown.space.prevent="onSpace"></div>`; },
+      onSpace() { calls++; },
+    });
+    const other = new KeyboardEvent("keydown", { key: "Tab", cancelable: true });
+    app.$element.dispatchEvent(other);
+    const space = new KeyboardEvent("keydown", { key: " ", cancelable: true });
+    app.$element.dispatchEvent(space);
+    expect(calls).toBe(1);
+    expect(other.defaultPrevented).toBe(false);
+    expect(space.defaultPrevented).toBe(true);
+    app.$destroy();
+  });
+
+  it("consumes .once only when a key filter matches", () => {
+    let calls = 0;
+    const app = createComponent({
+      template() { return `<input @keydown.enter.once="onEnter">`; },
+      onEnter() { calls++; },
+    });
+    const input = app.$element;
+    for (const key of ["a", "Enter", "Enter"]) {
+      input.dispatchEvent(new KeyboardEvent("keydown", { key }));
+    }
+    expect(calls).toBe(1);
+    app.$destroy();
+  });
+
+  it("runs @click.once only once", async () => {
+    let onClickFired = 0;
+    const App = {
+      template() {
+        return `<button id="onceBtn" @click.once="onClick">Once</button>`;
+      },
+      onClick() {
+        onClickFired += 1;
+      },
+    };
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const app = createComponent(App);
+    app.appendTo(host);
+    await flushMicrotasks();
+    const btn = host.querySelector("#onceBtn");
+    btn.click();
+    btn.click();
+    btn.click();
+    expect(onClickFired).toBe(1); // listener auto-removed after first run
+    app.$destroy();
+  });
+
+  it("legacy @submit-prevent suffix still prevents default", async () => {
+    let prevented = false;
+    const App = {
+      template() {
+        return `<form @submit-prevent="onSubmit"><button type="submit">Go</button></form>`;
+      },
+      onSubmit(event) {
+        prevented = event.defaultPrevented;
+      },
+    };
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const app = createComponent(App);
+    app.appendTo(host);
+    await flushMicrotasks();
+    host.querySelector("button").click();
+    expect(prevented).toBe(true);
+    app.$destroy();
+  });
+
+  it("nevers leaves raw {{ tokens }} in keyed x-for item text", async () => {
+    const App = {
+      template() {
+        return `<ul><li x-for="item in items" :key="item.path"><i class="ic">{{ item.icon }}</i><b>{{ item.label }}</b><span>{{ item.missing ?? 'fallback' }}</span></li></ul>`;
+      },
+      data() {
+        return {
+          items: [
+            { path: "a", icon: "home", label: "Home" },
+            { path: "b", icon: "api", label: "Providers" },
+          ],
+        };
+      },
+    };
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const app = createComponent(App);
+    app.appendTo(host);
+
+    const rows = [...host.querySelectorAll("li")];
+    expect(rows).toHaveLength(2);
+    expect(rows[0].querySelector(".ic").textContent).toBe("home");
+    expect(rows[1].querySelector(".ic").textContent).toBe("api");
+    expect(rows[0].textContent).toBe("homeHomefallback");
+    expect(rows[1].textContent).toBe("apiProvidersfallback");
+    expect(host.textContent).not.toMatch(/\{\{|\}\}/);
+
+    app.data.items.value = [
+      { path: "a", icon: "home", label: "Dashboard" },
+      { path: "b", icon: "api", label: "Providers" },
+    ];
+    await flushMicrotasks();
+    expect(host.querySelectorAll("li")[0].textContent).toBe("homeDashboardfallback");
+    expect(host.textContent).not.toMatch(/\{\{|\}\}/);
+    app.$destroy();
+  });
+
+  it("interpolates child component props without leaving raw tokens", async () => {
+    const Child = {
+      name: "ChildCard",
+      props: ["title", "message", "actionLabel"],
+      template() {
+        return `<div><h3>{{ title }}</h3><p>{{ message }}</p><button>{{ actionLabel || 'Retry' }}</button></div>`;
+      },
+    };
+    const App = {
+      template() {
+        return `<div><child-card title="Sign in to manage providers" message="Only authenticated users can browse." action-label="Go to sign in"></child-card></div>`;
+      },
+      components: { "child-card": Child },
+    };
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const app = createComponent(App);
+    app.appendTo(host);
+
+    expect(host.querySelector("h3").textContent).toBe("Sign in to manage providers");
+    expect(host.querySelector("p").textContent).toBe("Only authenticated users can browse.");
+    expect(host.querySelector("button").textContent).toBe("Go to sign in");
+    expect(host.textContent).not.toMatch(/\{\{|\}\}/);
+    app.$destroy();
+  });
+
+  it("never leaves raw tokens when a token expression fails to evaluate", async () => {
+    const App = {
+      template() {
+        return `<div><p id="a">{{ greeting }}, {{ boom() }}</p><p id="b">{{ missing.x.y }}</p></div>`;
+      },
+      data() {
+        return { greeting: "Hello" };
+      },
+    };
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    // Node's happy-dom console.warn is expected here (evaluate warns on TypeError)
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const app = createComponent(App);
+    app.appendTo(host);
+    spy.mockRestore();
+
+    // ReferenceError tokens are suppressed and replaced with empty string;
+    // the whole node is interpolated and never shows raw {{ }} markers.
+    expect(host.querySelector("#a").textContent).toBe("Hello, ");
+    expect(host.querySelector("#b").textContent).toBe("");
+    expect(host.textContent).not.toMatch(/\{\{|\}\}/);
+    app.$destroy();
   });
 });

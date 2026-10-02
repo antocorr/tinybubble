@@ -14,7 +14,7 @@ For Bubble apps, prefer `plugins/bubble-translate/bubble.js`.
 ```js
 import { createComponent } from "tinybubble";
 import { createTranslate } from "./plugins/bubble-translate/bubble.js";
-import App from "./components/App.bubble.js";
+import App from "./components/App.tiny.js";
 
 const t = createTranslate({
     defaultLang: "en_EN",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createComponent, createRouter, globals } from "../../src/index.js";
+import { createComponent, createRouter, globals, Signal } from "../../src/index.js";
 import { flushMicrotasks, waitFor } from "../setup/test-helpers.js";
 
 function mountRouterApp(router) {
@@ -191,6 +191,98 @@ describe("router", () => {
     });
     // re-mount must not duplicate rows from the previous render
     expect(document.querySelectorAll(".list-row").length).toBe(3);
+  });
+
+  it("resolves dynamic routes once per navigation, including multiple outlets", async () => {
+    window.location.hash = "#/";
+    let resolutions = 0;
+    const Page = { template() { return `<p class="page">Page</p>`; } };
+    const router = createRouter({
+      mode: "hash",
+      routes: () => {
+        resolutions++;
+        return [{ path: "/", component: Page }, { path: "/next", component: Page }];
+      },
+    });
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const app = createComponent({
+      template() { return `<main><router-view></router-view><router-view></router-view></main>`; },
+      components: { "router-view": router.RouterView },
+    });
+    app.appendTo(host);
+    expect(resolutions).toBe(1);
+    router.navigate("/next");
+    await waitFor(() => { expect(router.getDestination()).toBe("/next"); });
+    expect(resolutions).toBe(2);
+    expect(host.querySelectorAll(".page")).toHaveLength(2);
+    app.$destroy();
+  });
+
+  it("re-resolves function-form routes when their signal changes without navigation", async () => {
+    window.location.hash = "#/";
+    const active = Signal(false);
+    let resolutions = 0;
+    const Page = { template() { return `<p id="dynamic-page">Dynamic</p>`; } };
+    const router = createRouter({
+      mode: "hash",
+      routes: () => {
+        resolutions++;
+        return active.value ? [{ path: "/", component: Page }] : [];
+      },
+    });
+    const { app } = mountRouterApp(router);
+    expect(document.querySelector("#dynamic-page")).toBeNull();
+    active.value = true;
+    await waitFor(() => { expect(document.querySelector("#dynamic-page")).not.toBeNull(); });
+    expect(resolutions).toBe(2);
+    active.value = false;
+    await waitFor(() => { expect(document.querySelector("#dynamic-page")).toBeNull(); });
+    expect(resolutions).toBe(3);
+    app.$destroy();
+  });
+
+  it("does not track lifecycle or functional page reads in RouterView", async () => {
+    window.location.hash = "#/";
+    const external = Signal(0);
+    let mounts = 0;
+    let destroys = 0;
+    let functionalRenders = 0;
+    const Home = {
+      template() { return `<p>Home</p>`; },
+      beforeDestroy() { external.value; destroys++; },
+    };
+    const Page = {
+      template() { return `<p>Page</p>`; },
+      init() { mounts++; },
+      beforeDestroy() { destroys++; },
+    };
+    const Functional = () => {
+      external.value;
+      functionalRenders++;
+      return document.createElement("p");
+    };
+    const router = createRouter({
+      mode: "hash",
+      routes: [
+        { path: "/", component: Home },
+        { path: "/page", component: Page },
+        { path: "/functional", component: Functional },
+      ],
+    });
+    const { app } = mountRouterApp(router);
+    router.navigate("/page");
+    await waitFor(() => { expect(mounts).toBe(1); });
+    external.value++;
+    await flushMicrotasks();
+    expect(mounts).toBe(1);
+    expect(destroys).toBe(1);
+    router.navigate("/functional");
+    await waitFor(() => { expect(functionalRenders).toBe(1); });
+    external.value++;
+    await flushMicrotasks();
+    expect(functionalRenders).toBe(1);
+    app.$destroy();
   });
 
   it("loads route components lazily from src", async () => {

@@ -27,7 +27,7 @@ grep -R -n -E "\.events\.topic\(\"[a-zA-Z0-9_-]+\"\)\.on\(" --include='*.js' "${
 
 echo
 echo "[6/7] Searching for bubble-translate non-wrapper imports in Bubble components..."
-grep -R -n -E "bubble-translate/index\.js" --include='*.bubble.js' --include='*.bub.js' "${ROOT}" || true
+grep -R -n -E "bubble-translate/index\.js" --include='*.tiny.js' --include='*.tb.js' --include='*.js' "${ROOT}" || true
 
 echo
 echo "[7/7] Searching for multiple globals.t assignments..."

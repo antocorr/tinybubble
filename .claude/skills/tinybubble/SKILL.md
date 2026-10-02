@@ -1,6 +1,6 @@
 ---
 name: tinybubble
-description: TinyBubble component/page authoring, props-emits wiring, router usage, pub-sub topic lifecycle, JobManager, globals, and plugin integration (especially bubble-translate). Always apply for files ending in .bub.js or .bubble.js, and for any TinyBubble UI task including reactivity, signals, templating, routing, or events.
+description: TinyBubble component/page authoring, props-emits wiring, router usage, pub-sub topic lifecycle, JobManager, globals, and plugin integration (especially bubble-translate). Always apply for files ending in .tiny.js or .tb.js (plain .js component files count too), and for any TinyBubble UI task including reactivity, signals, templating, routing, or events.
 license: MIT
 metadata:
   author: antocorr
@@ -12,7 +12,7 @@ metadata:
 ## When To Apply
 
 Apply when the request involves:
-- New TinyBubble component/page creation or refactor (`.bub.js`, `.bubble.js`, any component file)
+- New TinyBubble component/page creation or refactor (`.tiny.js`, `.tb.js`, or any plain `.js` component file)
 - Signal/effect/computed/watch usage
 - Child component registration with props/emits
 - Fixing props and template binding mistakes
@@ -23,7 +23,7 @@ Apply when the request involves:
 - TinyBubble translation wiring (`globals.t`, `i18nLang`, language switch)
 - Work inside `plugins/bubble-translate/`
 
-**Auto-trigger:** always activate for files ending `.bub.js` or `.bubble.js`.
+**Auto-trigger:** always activate for files ending `.tiny.js` or `.tb.js`. Also activate for plain `.js` files when the content/context is clearly a TinyBubble component (uses `createComponent`, `template()`, `data()`, etc.).
 
 ---
 
@@ -400,7 +400,7 @@ Use `plugins/bubble-translate/bubble.js` for TinyBubble apps.
 ```js
 import { createComponent } from "tinybubble";
 import { createTranslate } from "./plugins/bubble-translate/bubble.js";
-import App from "./components/App.bubble.js";
+import App from "./components/App.tiny.js";
 
 const t = createTranslate({
     defaultLang: "en_EN",

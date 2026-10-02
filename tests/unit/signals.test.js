@@ -53,6 +53,43 @@ describe("signals", () => {
     ]);
   });
 
+  it("keeps tracking the outer effect after a nested effect is created", async () => {
+    const inner = Signal(0);
+    const outer = Signal("a");
+    const outerRuns = [];
+
+    effect(() => {
+      // creating a nested effect must not clobber the outer effect's tracking
+      effect(() => {
+        inner.value;
+      });
+      outerRuns.push(outer.value);
+    });
+
+    outer.value = "b";
+    await flushMicrotasks();
+
+    expect(outerRuns).toEqual(["a", "b"]);
+  });
+
+  it("dispose unsubscribes the effect from its signals immediately", async () => {
+    const sig = Signal(0);
+    const seen = [];
+
+    const dispose = effect(() => {
+      seen.push(sig.value);
+    });
+
+    expect(sig._subscribers.size).toBe(1);
+    dispose();
+    expect(sig._subscribers.size).toBe(0);
+
+    sig.value = 1;
+    await flushMicrotasks();
+
+    expect(seen).toEqual([0]);
+  });
+
   it("watch does not track signals read inside callback", async () => {
     const source = Signal("a");
     const local = Signal(0);

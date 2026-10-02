@@ -1,5 +1,5 @@
 // bubble-router.js
-import { html, effect, createSignal, createComponent, globals, Signal } from '../index.js';
+import { html, effect, createSignal, createComponent, globals, Signal, untrack } from '../index.js';
 
 export function createRouter({ mode = 'history', base = '/', routes = [], srcBase = null }) {
     const resolvedSrcBase = srcBase
@@ -87,17 +87,11 @@ export function createRouter({ mode = 'history', base = '/', routes = [], srcBas
         });
         return RouterLink({ to, children, ...attrs });
     }
-    // Helper: converts path "/user/:id" into a regex and extracts params
-    // Also supports optional params ":id?"
-    function matchRoute(routePath, currentPath) {
-        if (routePath === '*') {
-            return { params: {} };
-        }
-
-        // If there are no dynamic params, exact match
-        if (!routePath.includes(':')) {
-            return routePath === currentPath ? { params: {} } : null;
-        }
+    // Compiled route patterns, built once per routePath
+    const compiledRoutes = new Map();
+    function compileRoute(routePath) {
+        let compiled = compiledRoutes.get(routePath);
+        if (compiled) return compiled;
 
         const paramNames = [];
         const routeSegments = routePath.split('/').filter(Boolean);
@@ -113,14 +107,31 @@ export function createRouter({ mode = 'history', base = '/', routes = [], srcBas
         });
 
         const regexPath = regexParts.length ? regexParts.join('') : '/';
+        compiled = { regex: new RegExp(`^${regexPath}$`), paramNames };
+        compiledRoutes.set(routePath, compiled);
+        return compiled;
+    }
 
-        const match = currentPath.match(new RegExp(`^${regexPath}$`));
+    // Helper: converts path "/user/:id" into a regex and extracts params
+    // Also supports optional params ":id?"
+    function matchRoute(routePath, currentPath) {
+        if (routePath === '*') {
+            return { params: {} };
+        }
+
+        // If there are no dynamic params, exact match
+        if (!routePath.includes(':')) {
+            return routePath === currentPath ? { params: {} } : null;
+        }
+
+        const { regex, paramNames } = compileRoute(routePath);
+        const match = currentPath.match(regex);
         if (!match) return null;
 
         const params = {};
-        match.slice(1).forEach((val, i) => {
-            if (paramNames[i]) params[paramNames[i]] = val;
-        });
+        for (let i = 0; i < paramNames.length; i++) {
+            if (paramNames[i]) params[paramNames[i]] = match[i + 1];
+        }
         return { params };
     }
 
@@ -133,6 +144,7 @@ export function createRouter({ mode = 'history', base = '/', routes = [], srcBas
         return { match: null, params: {} };
     }
 
+    const routeSelection = Signal(null);
     effect(() => {
         const current = getDestination();
         const resolved = resolveRoute(current);
@@ -141,6 +153,7 @@ export function createRouter({ mode = 'history', base = '/', routes = [], srcBas
             params: resolved.params,
             query: Object.fromEntries(new URLSearchParams(getLocationQuery()))
         };
+        routeSelection.value = resolved;
     });
 
     const componentMemory = new Map();
@@ -149,49 +162,52 @@ export function createRouter({ mode = 'history', base = '/', routes = [], srcBas
         const outlet = html(`<div></div>`);
         let mountedComp = null;
         let mountedIsPersistent = false;
+        let navToken = 0;
 
-        effect(async () => {
-            const current = getDestination();
-            const resolved = resolveRoute(current);
-            const match = resolved.match;
-            const params = resolved.params;
+        effect(() => {
+            const match = routeSelection.value.match;
+            const token = ++navToken;
+            untrack(async () => {
+                // Destroy previous component (skip persistent — it stays alive in memory)
+                if (mountedComp && !mountedIsPersistent) mountedComp.$destroy();
+                outlet.innerHTML = '';
+                mountedComp = null;
+                mountedIsPersistent = false;
 
-            // Destroy previous component (skip persistent — it stays alive in memory)
-            if (mountedComp && !mountedIsPersistent) mountedComp.$destroy();
-            outlet.innerHTML = '';
-            mountedComp = null;
-            mountedIsPersistent = false;
-
-            if (match) {
-                if (match.src && !match.component) {
-                    try {
-                        const src = resolveRouteSrc(match.src);
-                        const compModule = await import(src);
-                        match.component = compModule.default || compModule;
-                    } catch (e) {
-                        return;
-                    }
-                }
-
-                if (typeof match.component != "function" && match.component.template) {
-                    let comp;
-                    if (match.persistent && componentMemory.has(match.path)) {
-                        comp = componentMemory.get(match.path);
-                    } else {
-                        comp = createComponent(match.component, match.data || {});
-                        if (match.persistent) {
-                            componentMemory.set(match.path, comp);
+                if (match) {
+                    if (match.src && !match.component) {
+                        try {
+                            const src = resolveRouteSrc(match.src);
+                            const compModule = await import(src);
+                            match.component = compModule.default || compModule;
+                        } catch (e) {
+                            return;
                         }
+                        // a newer navigation started while the module was loading:
+                        // let it own the outlet, don't mount a stale route
+                        if (token !== navToken) return;
                     }
-                    outlet.appendChild(comp.$element);
-                    comp._renderRoot?.();
-                    mountedComp = comp;
-                    mountedIsPersistent = !!match.persistent;
-                } else {
-                    // Functional component
-                    outlet.appendChild(match.component({ $route: routeSignal.value }));
+
+                    if (typeof match.component != "function" && match.component.template) {
+                        let comp;
+                        if (match.persistent && componentMemory.has(match.path)) {
+                            comp = componentMemory.get(match.path);
+                        } else {
+                            comp = createComponent(match.component, match.data || {});
+                            if (match.persistent) {
+                                componentMemory.set(match.path, comp);
+                            }
+                        }
+                        outlet.appendChild(comp.$element);
+                        comp._renderRoot?.();
+                        mountedComp = comp;
+                        mountedIsPersistent = !!match.persistent;
+                    } else {
+                        // Functional component
+                        outlet.appendChild(match.component({ $route: routeSignal.value }));
+                    }
                 }
-            }
+            });
         });
         return outlet;
     }

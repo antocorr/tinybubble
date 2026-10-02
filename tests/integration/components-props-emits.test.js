@@ -72,6 +72,29 @@ describe("components props and emits", () => {
     expect(host.querySelector("#picked").textContent).toContain("2");
   });
 
+  it("preserves this and all emitted arguments for bare and expression handlers", () => {
+    const seen = [];
+    const Child = {
+      emits: ["select"],
+      template() { return `<button @click="send">Send</button>`; },
+      send() { this.emit("select", "item", 7); },
+    };
+    const app = createComponent({
+      name: "Parent",
+      components: { "child-box": Child },
+      template() {
+        return `<main><child-box @select="receive"></child-box><child-box @select="receive($event, $args[1])"></child-box></main>`;
+      },
+      receive(...args) { seen.push([this.name, args]); },
+    });
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    app.appendTo(host);
+    host.querySelectorAll("button").forEach((button) => button.click());
+    expect(seen).toEqual([["Parent", ["item", 7]], ["Parent", ["item", 7]]]);
+    app.$destroy();
+  });
+
   it("calls mounted on child components without appendTo", async () => {
     const innerMounted = [];
 

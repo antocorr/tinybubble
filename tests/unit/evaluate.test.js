@@ -15,6 +15,16 @@ describe("evaluate", () => {
     expect(result).toBeCloseTo(19.52, 2);
   });
 
+  it("reads each scope value once and supports a changing scope shape", () => {
+    let reads = 0;
+    const scope = { get count() { reads++; return Signal(2); } };
+    expect(evaluate("count + extra", scope)).toBeUndefined();
+    expect(reads).toBe(1);
+    scope.extra = 3;
+    expect(evaluate("count + extra", scope)).toBe(5);
+    expect(reads).toBe(2);
+  });
+
   it("returns undefined on ReferenceError expressions", () => {
     const result = evaluate("missingValue + 1", {});
     expect(result).toBeUndefined();

@@ -15,6 +15,39 @@ describe("EventTopic", () => {
     expect(calls).toEqual([[1, 2]]);
   });
 
+  it("preserves callback context, argument order and fluent aliases", () => {
+    const topic = new EventTopic();
+    const receiver = { calls: [] };
+    topic.setupApc(receiver);
+    function callback(...args) { this.calls.push(args); }
+    expect(topic.on("message", callback, "listener")).toBe(topic);
+    expect(topic.emit("message", "hello", 42, { ok: true })).toBe(topic);
+    expect(receiver.calls).toEqual([["hello", 42, { ok: true }]]);
+    expect(topic.off("message", null, "listener")).toBe(topic);
+    topic.emit("message", "ignored");
+    expect(receiver.calls).toHaveLength(1);
+  });
+
+  it("forwards copied methods and APC calls with their original context", () => {
+    const topic = new EventTopic();
+    const facade = {};
+    topic.copyFunctionalities(facade);
+    const seen = [];
+    facade.on("message", function (...args) { seen.push([this, args]); });
+    facade.emit("message", "first", 2);
+    expect(seen).toEqual([[topic, ["first", 2]]]);
+    const receiver = {
+      value: 10,
+      add(a, b) { seen.push([this.value, a, b]); },
+    };
+    topic.setupApc(receiver);
+    topic.apc("add", 3, 4);
+    expect(seen[1]).toEqual([10, 3, 4]);
+    topic.aset("value", 20);
+    topic.apc("add", 5, 6);
+    expect(seen[2]).toEqual([20, 5, 6]);
+  });
+
   it("supports one-time listeners", () => {
     const topic = new EventTopic();
     const calls = [];

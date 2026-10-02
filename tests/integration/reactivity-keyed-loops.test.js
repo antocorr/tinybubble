@@ -83,6 +83,56 @@ describe("keyed x-for", () => {
     expect(rowsByLabel(host).Bravo.querySelector(".note").value).toBe("typed by user");
   });
 
+  it("does not move unchanged rows when the list is copied", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    let reads = 0;
+    const app = createComponent({
+      data() { return { items: [{ id: "a", label: "Alpha" }, { id: "b", label: "Bravo" }] }; },
+      template() { return `<ul><li x-for="item in items" :key="item.id">{{ label(item) }}</li></ul>`; },
+      label(item) { reads++; return item.label; },
+    });
+    app.appendTo(host);
+    const list = host.querySelector("ul");
+    const insertBefore = list.insertBefore;
+    let moves = 0;
+    list.insertBefore = function (...args) { moves++; return insertBefore.apply(this, args); };
+    const before = [...host.querySelectorAll("li")];
+    reads = 0;
+    app.data.items.value = [...app.data.items.value];
+    await flushMicrotasks();
+    expect([...host.querySelectorAll("li")]).toEqual(before);
+    expect(moves).toBe(0);
+    expect(reads).toBe(2);
+    // The same object may have been mutated before assigning a new array.
+    const rawItem = app.data.items.value[0];
+    rawItem.label = "Changed";
+    app.data.items.value = [...app.data.items.value];
+    await flushMicrotasks();
+    expect(host.querySelector("li").textContent).toBe("Changed");
+    app.$destroy();
+  });
+
+  it("moves multi-node keyed template groups together", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const app = createComponent({
+      data() { return { items: [{ id: "a" }, { id: "b" }, { id: "c" }] }; },
+      template() {
+        return `<section><template x-for="item in items" :key="item.id"><b>{{ item.id }}</b><i>{{ item.id }}</i></template></section>`;
+      },
+    });
+    app.appendTo(host);
+    const before = [...host.querySelectorAll("b, i")];
+    app.data.items.value = [...app.data.items.value].reverse();
+    await flushMicrotasks();
+    expect([...host.querySelectorAll("b, i")].map((el) => `${el.tagName}:${el.textContent}`)).toEqual([
+      "B:c", "I:c", "B:b", "I:b", "B:a", "I:a",
+    ]);
+    expect([...host.querySelectorAll("b, i")].slice(0, 2)).toEqual(before.slice(4, 6));
+    app.$destroy();
+  });
+
   it("updates content when the same key receives new data", async () => {
     const host = mount(makeApp());
     const before = rowsByLabel(host);

@@ -56,21 +56,17 @@ export class EventTopic {
         return this;
     }
     on(event, callback, id = null) {
-        this.addEventListener(event, callback, id);
-        return this;
+        return this.addEventListener(event, callback, id);
     }
     off(event, callback = null, id = null) {
-        this.removeEventListener(event, callback, id);
-        return this;
+        return this.removeEventListener(event, callback, id);
     }
     removeAllListeners() {
         this.listeners = {};
         return this;
     }
-    emit(event) {
+    emit(event, ...args) {
         if (this.listeners[event]) {
-            var args = Array.prototype.slice.call(arguments);
-            event = args.shift();
             for (var listener of this.listeners[event]) {
                 const thisArg = this.$obj || this;
                 listener.callback.apply(thisArg, args);
@@ -84,17 +80,15 @@ export class EventTopic {
     one(event, callback) {
         this.addEventListener(event, callback, null, true)
     }
-    once(event){
-        var args = Array.prototype.slice.call(arguments);
-        this.emit.apply(this, args);
+    once(event, ...args){
+        this.emit(event, ...args);
         this.removeEventListener(event);
         return this;
     }
-    bubble(event) {
+    bubble(event, ...args) {
         this.emit(event);
         if(this.parent && this.parent.emit){
-            var args = Array.prototype.slice.call(arguments);
-            this.parent.bubble(this, args);
+            this.parent.bubble(this, [event, ...args]);
         }
         return this;
     }
@@ -118,22 +112,19 @@ export class EventTopic {
     copyFunctionalities(obj){
         const self = this;
         for(const fn of ['addEventListener', 'removeEventListener', 'on', 'off', 'emit', 'topic']){
-            obj[fn] = function () {
-               const  args = Array.prototype.slice.call(arguments);
-               self[fn].apply(self, args);
+            obj[fn] = function (...args) {
+               self[fn](...args);
             }            
         }
     }
     setupApc(obj) {
         this.$obj = obj;
     }
-    apc(func, args) {
+    apc(func, ...args) {
         if (!this.$obj || !this.$obj[func]) {
             return;
         }
-        args = Array.prototype.slice.call(arguments);
-        func = args.shift();
-        this.$obj[func].apply(this.$obj, args);
+        this.$obj[func](...args);
     }
     aset(key, val) {
         if (!this.$obj) {

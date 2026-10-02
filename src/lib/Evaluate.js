@@ -1,6 +1,7 @@
 import { SignalObject } from "./Signals.js";
 
 const fnCache = new Map();
+const tokenCache = new Map();
 
 /**
  * Helper to evaluate JS expressions within the data context
@@ -13,21 +14,27 @@ const fnCache = new Map();
  */
 export function evaluate(expression, scope, context = null, returnSignal = false) {
     try {
-        // Optimization: Unique token extraction + Scope intersection
-        // Regex matches identifiers: starts with letter/$/_, followed by letter/number/$/_
-        const tokens = expression.match(/[a-zA-Z_$][a-zA-Z0-9_$]*/g) || [];
-        const uniqueTokens = new Set(tokens);
-        
+        // Optimization: Unique token extraction + Scope intersection.
+        // Regex matches identifiers: starts with letter/$/_, followed by letter/number/$/_.
+        // Tokens are per-expression constants — extract and sort them once.
+        let tokens = tokenCache.get(expression);
+        if (!tokens) {
+            tokens = [...new Set(expression.match(/[a-zA-Z_$][a-zA-Z0-9_$]*/g) || [])].sort();
+            tokenCache.set(expression, tokens);
+        }
+
         // Identify which tokens are actually in scope
+        // (tokens are pre-sorted, so validKeys stays sorted → stable cache key)
         const validKeys = [];
-        for (const token of uniqueTokens) {
+        const values = [];
+        for (const token of tokens) {
             if (token in scope) {
                 validKeys.push(token);
+                const value = scope[token];
+                values.push(value instanceof SignalObject && !returnSignal ? value.value : value);
             }
         }
-        // Sort to ensure cache consistency (a,b vs b,a)
-        validKeys.sort();
-        
+
         // Cache Key: Expression + keys
         const cacheKey = expression + '::' + validKeys.join(',');
         
@@ -39,17 +46,7 @@ export function evaluate(expression, scope, context = null, returnSignal = false
             fnCache.set(cacheKey, fn);
         }
 
-        // Map values from scope. 
-        // IMPORTANT: We pass the SignalObject itself, not .value!
-        // This allows signal.value usage in expressions, and implicit usage via valueOf
-        // Extract values in the same order as keys
-        const values = validKeys.map(k => {
-            return (scope[k] instanceof SignalObject && !returnSignal) ? scope[k].value : scope[k];
-        });
-        
-        // Evaluate
-        const result = fn.apply(context, values);
-        return result;
+        return fn.apply(context, values);
     } catch (e) {
         // Suppress ReferenceError (treat as undefined)
         if (!(e instanceof ReferenceError)) {

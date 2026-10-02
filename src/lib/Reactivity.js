@@ -1,4 +1,4 @@
-import { effect, Signal, SignalObject, watch, collectEffects, computed, registerDispose } from "./Signals.js";
+import { effect, Signal, SignalObject, watch, collectEffects, computed, registerDispose, untrack } from "./Signals.js";
 import { evaluate } from "./Evaluate.js";
 
 /**
@@ -33,10 +33,17 @@ const BOOLEAN_ATTRS = new Set([
 ]);
 
 /**
- * Replaces syntax sugar (@click -> -x-on:click)
+ * Replaces syntax sugar (@click -> -x-on:click).
+ *
+ * Supports one or more trailing event modifiers, e.g. `@click.stop.prevent="fn"`
+ * is rewritten to `-x-on:click.stop.prevent="fn"`. Modifiers are applied later
+ * in `attachEvent` (see parseEventName): `.prevent`, `.stop`, `.self`, `.once`
+ * and key-name filters (`.enter`, `.space`, `.escape`, ...). Without this,
+ * a directive such as `@pointerdown.stop` would be left as a dead HTML
+ * attribute because the old regex only matched a bare `@event=`.
  */
 function bubblify(str) {
-    return str.replace(/@([a-zA-Z0-9_-]+)(\s*=)/g, (_, eventName, eq) => {
+    return str.replace(/@([a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_-]+)*)(\s*=)/g, (_, eventName, eq) => {
         return `-x-on:${eventName}${eq}`;
     });
 }
@@ -136,15 +143,19 @@ function trackNode(child, anchor, expectedParent) {
 
 /**
  * Evaluate an event-handler expression. If the expression is a bare method name,
- * call it directly on the component. Otherwise evaluate and call the result.
+ * call it directly on the component. Build the scope only for expressions.
+ * @param {Event|null} event Native event; omitted for component emits.
  */
-function invokeExpr(expr, component, scope, args) {
+function invokeExpr(expr, component, localScope, args, event = null) {
     if (typeof expr === 'string' && !expr.includes(' ') && !expr.includes('(')) {
         if (typeof component[expr] === 'function') {
             component[expr](...args);
             return;
         }
     }
+    const scope = buildScope(component, localScope);
+    scope.$event = event || args[0];
+    if (!event) scope.$args = args;
     const res = evaluate(expr, scope, component);
     if (typeof res === 'function') res(...args);
 }
@@ -293,11 +304,17 @@ function runKeyedForEffect(tpl, parsed, component, localScope, bindNodeFn) {
                 const nodes = insertClone(tpl, component, scope, bindNodeFn, disposers);
                 entry = { nodes, disposers, itemSig, indexSig };
             }
-            entry.nodes.forEach(n => parent.insertBefore(n, anchor));   // move into order
             next.set(key, entry);
         });
 
         entries.forEach(e => teardown(e.disposers, e.nodes));           // leftovers were removed
+        let cursor = anchor;
+        for (const entry of [...next.values()].reverse()) {
+            if (entry.nodes.length && entry.nodes[entry.nodes.length - 1].nextSibling !== cursor) {
+                entry.nodes.forEach(n => parent.insertBefore(n, cursor));
+            }
+            if (entry.nodes.length) cursor = entry.nodes[0];
+        }
         entries = next;
     });
 
@@ -383,28 +400,79 @@ function handleRefs(el, component) {
     }
 }
 
+const EVENT_MODIFIER_KEYS = {
+    esc: 'escape',
+    space: ' ',
+    spacebar: ' ',
+    up: 'arrowup',
+    down: 'arrowdown',
+    left: 'arrowleft',
+    right: 'arrowright',
+    del: 'delete',
+};
+
+function normalizeKey(value) {
+    const lower = value == null ? '' : String(value).toLowerCase();
+    return EVENT_MODIFIER_KEYS[lower] || lower;
+}
+
 /**
- * Bind a native DOM event to an expression. Supports the `-prevent` suffix;
- * input/change handlers receive (value, oldValue, event) instead of (event).
+ * Split an event binding (e.g. `keydown.enter.prevent`) into the real DOM event
+ * name and the set of modifiers to apply when the event fires. The legacy
+ * `-prevent` suffix (pre-modifier syntax) is still honoured.
+ */
+function parseEventName(raw) {
+    let base = (raw || '').trim();
+    const parsed = { base, prevent: false, stop: false, self: false, once: false, key: null };
+
+    if (base.includes('-prevent')) {
+        parsed.prevent = true;
+        base = base.replace('-prevent', '').trim();
+    }
+
+    if (base.includes('.')) {
+        const parts = base.split('.');
+        base = parts.shift();
+        for (const mod of parts) {
+            if (mod === 'prevent') parsed.prevent = true;
+            else if (mod === 'stop') parsed.stop = true;
+            else if (mod === 'self') parsed.self = true;
+            else if (mod === 'once') parsed.once = true;
+            else parsed.key = parsed.key || normalizeKey(mod);
+        }
+    }
+
+    parsed.base = base;
+    return parsed;
+}
+
+function keyMatchesEvent(key, event) {
+    if (!key || !event) return true;
+    const actual = normalizeKey(event.key != null ? event.key : event.code);
+    return actual === key;
+}
+
+/**
+ * Bind a native DOM event to an expression. Supports event modifiers — `.prevent`,
+ * `.stop`, `.self`, `.once` and key-name filters (`.enter`, `.space`, `...`) — plus
+ * the legacy `-prevent` suffix. input/change handlers receive (value, oldValue, event)
+ * instead of (event).
  */
 function attachEvent(el, eventName, expr, component, localScope) {
+    const { base, prevent, stop, self, once, key } = parseEventName(eventName);
+    const valueEvent = base === 'input' || base === 'change';
     let oldVal = el.value || undefined;
-    let prevent = false;
-    if (eventName.includes('-prevent')) {
-        prevent = true;
-        eventName = eventName.replace('-prevent', '').trim();
-    }
-    el.addEventListener(eventName, (event) => {
+    const handler = (event) => {
+        if (self && event.target !== el) return;
+        if (!keyMatchesEvent(key, event)) return;
+        if (once) el.removeEventListener(base, handler);
+        if (stop) event.stopPropagation();
         if (prevent) event.preventDefault();
-        const scope = buildScope(component, localScope);
-        scope.$event = event;
-        if (['input', 'change'].includes(eventName)) {
-            invokeExpr(expr, component, scope, [event.target.value, oldVal, event]);
-            oldVal = event.target.value;
-        } else {
-            invokeExpr(expr, component, scope, [event]);
-        }
-    });
+        const args = valueEvent ? [event.target.value, oldVal, event] : [event];
+        invokeExpr(expr, component, localScope, args, event);
+        if (valueEvent) oldVal = event.target.value;
+    };
+    el.addEventListener(base, handler);
 }
 
 function handleEvents(el, component, localScope) {
@@ -474,10 +542,7 @@ function handleCustomComponent(el, component, localScope) {
                 if (definedEvent) {
                     if (!emitListeners[definedEvent]) emitListeners[definedEvent] = [];
                     emitListeners[definedEvent].push((...args) => {
-                        const scope = buildScope(component, localScope);
-                        scope.$event = args[0];
-                        scope.$args = args;
-                        invokeExpr(attr.value, component, scope, args);
+                        invokeExpr(attr.value, component, localScope, args);
                     });
                 } else {
                     nativeEventBindings.push({ eventName, expr: attr.value });
@@ -507,12 +572,14 @@ function handleCustomComponent(el, component, localScope) {
 function handleTextNode(el, component, localScope) {
     if (!el.textContent.includes('{{')) return;
     const template = el.textContent;
+
     effect(() => {
         const scope = buildScope(component, localScope);
-        el.textContent = template.replace(/\{\{(.+?)\}\}/g, (_, expr) => {
+        const next = template.replace(/\{\{(.+?)\}\}/g, (_, expr) => {
             const val = evaluate(expr.trim(), scope, component);
-            return val !== undefined && val !== null ? val : '';
+            return val !== undefined && val !== null ? String(val) : '';
         });
+        if (el.textContent !== next) el.textContent = next;
     });
 }
 
@@ -624,6 +691,11 @@ function bindNode(el, component, localScope) {
  * Creates the component
  */
 export function createComponent(original, data, _props, parent = null, emitListeners = {}) {
+    // Setup (data/props/lifecycle) must never leak signal reads into whatever
+    // effect happens to be creating this component (e.g. a parent x-for/x-if,
+    // or the router mounting a route synchronously inside its own effect) —
+    // only the explicit template bindings below establish real subscriptions.
+    return untrack(() => {
     const declaredProps = Array.isArray(original?.props) ? original.props : [];
 
     // 0. Handle Functional Components (e.g. RouterView, RouterLink)
@@ -752,6 +824,7 @@ export function createComponent(original, data, _props, parent = null, emitListe
     if (component.mounted) component.mounted();
 
     return component;
+    });
 }
 
 /**
